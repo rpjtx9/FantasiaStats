@@ -12,4 +12,4 @@ ENV DATA_DIR=/data
 
 EXPOSE 5000
 
-CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "--timeout", "60", "app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "6", "--timeout", "60", "app:app"]
