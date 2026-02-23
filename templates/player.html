@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Player — Fantasia Rankings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root {
+  --bg: #0b0e1a; --surface: #111827; --card: #141d2e; --border: #1e2d47;
+  --accent: #00d4ff; --accent2: #7c3aed; --green: #10b981; --yellow: #f59e0b;
+  --red: #ef4444; --text: #e2e8f0; --muted: #64748b;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'Barlow', sans-serif; min-height: 100vh; }
+body::before {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+}
+nav {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(11,14,26,0.92); backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 32px; display: flex; align-items: center; height: 56px; gap: 24px;
+}
+.nav-logo { font-family: 'Rajdhani',sans-serif; font-size: 20px; font-weight: 700; letter-spacing: 0.1em; color: var(--accent); text-transform: uppercase; }
+.nav-logo span { color: var(--text); }
+.nav-back { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; padding: 6px 12px; border-radius: 4px; transition: color 0.15s, background 0.15s; }
+.nav-back:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+main { max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
+
+/* Search */
+.search-bar { display: flex; gap: 8px; margin-bottom: 20px; }
+.search-input { flex: 1; background: var(--surface); border: 1px solid var(--border); color: var(--text); font-family: 'Barlow', sans-serif; font-size: 16px; padding: 10px 14px; border-radius: 6px; outline: none; transition: border-color 0.15s; }
+.search-input:focus { border-color: var(--accent); }
+.search-input::placeholder { color: var(--muted); }
+.search-btn { background: var(--accent); color: var(--bg); border: none; font-family: 'Rajdhani', sans-serif; font-size: 16px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; padding: 10px 20px; border-radius: 6px; cursor: pointer; transition: opacity 0.15s; }
+.search-btn:hover { opacity: 0.85; }
+.search-results { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; display: none; margin-bottom: 16px; }
+.search-result-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; cursor: pointer; transition: background 0.1s; border-bottom: 1px solid rgba(255,255,255,0.03); }
+.search-result-item:last-child { border-bottom: none; }
+.search-result-item:hover { background: rgba(0,212,255,0.05); }
+
+/* Scorecard */
+.scorecard-header { display: flex; align-items: center; gap: 16px; padding: 24px; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 16px; }
+.scorecard-name { font-family: 'Rajdhani', sans-serif; font-size: 38px; font-weight: 700; color: var(--text); }
+.scorecard-job  { font-size: 16px; color: var(--muted); margin-top: 4px; }
+.scorecard-stats { display: grid; grid-template-columns: repeat(7, 1fr); gap: 12px; margin-bottom: 16px; }
+@media (max-width: 900px) { .scorecard-stats { grid-template-columns: repeat(4, 1fr); } }
+.stat-block { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 16px; text-align: center; }
+.stat-value { font-family: 'Rajdhani', sans-serif; font-size: 30px; font-weight: 700; color: var(--text); line-height: 1; }
+.stat-label { font-size: 13px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-top: 6px; }
+.stat-block.green .stat-value { color: var(--green); }
+.stat-block.blue  .stat-value { color: var(--accent); }
+.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+.grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 16px; }
+@media (max-width: 900px) { .grid-3, .grid-5 { grid-template-columns: 1fr; } }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px 24px; position: relative; overflow: hidden; }
+.card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--accent), transparent); opacity: 0.3; }
+.card-title { font-family: 'Rajdhani', sans-serif; font-size: 15px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; }
+.chart-wrap { position: relative; width: 100%; }
+.chart-wrap canvas { display: block; }
+.loading { text-align: center; padding: 60px; color: var(--muted); font-family: 'Share Tech Mono', monospace; font-size: 14px; }
+.loading::after { content: ''; animation: dots 1.2s steps(3,end) infinite; }
+@keyframes dots { 0%,20%{content:'.'} 40%,60%{content:'..'} 80%,100%{content:'...'} }
+.empty-state { color: var(--muted); font-size: 14px; text-align: center; padding: 40px; }
+.class-dot { border-radius: 50%; flex-shrink: 0; }
+</style>
+</head>
+<body>
+<nav>
+  <div class="nav-logo">FantasiaStats<span>.ms</span></div>
+  <a href="/" class="nav-back">← Dashboard</a>
+</nav>
+<main>
+  <div class="search-bar">
+    <input type="text" id="player-search-input" class="search-input" placeholder="Search player name..." autocomplete="off">
+    <button class="search-btn" id="player-search-btn">Search</button>
+  </div>
+  <div class="search-results" id="search-results-dropdown"></div>
+  <div id="scorecard-container">
+    <!-- pre-load from URL param if present -->
+  </div>
+</main>
+
+<script>
+const CLASS_COLORS = {
+  Beginner: '#95a5a6', Warrior: '#ff4444', Magician: '#bb44ff',
+  Archer: '#33ff77', Thief: '#4488ff', Pirate: '#ffaa00',
+};
+
+const charts = {};
+
+const chartDefaults = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { display: false } },
+  scales: {
+    x: { ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 13 }, maxRotation: 45 }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' } },
+    y: { ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 13 } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' } },
+  },
+};
+
+function makeChart(id, type, data, options={}) {
+  if (charts[id]) charts[id].destroy();
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  charts[id] = new Chart(ctx, { type, data, options: { ...chartDefaults, ...options } });
+}
+
+function fmtExp(n) {
+  if (n >= 1_000_000_000) return (n/1e9).toFixed(2)+'B';
+  if (n >= 1_000_000) return (n/1e6).toFixed(2)+'M';
+  if (n >= 1_000) return (n/1e3).toFixed(1)+'K';
+  return n.toLocaleString();
+}
+
+async function loadPlayer(name) {
+  const container = document.getElementById('scorecard-container');
+  container.innerHTML = '<div class="loading">Loading</div>';
+
+  // Update URL without reload so it's shareable/bookmarkable
+  history.replaceState(null, '', `/player/${encodeURIComponent(name)}`);
+  document.title = `${name} — Fantasia Rankings`;
+
+  const res = await fetch(`/api/player/${encodeURIComponent(name)}`);
+  const d = await res.json();
+
+  if (!res.ok) {
+    container.innerHTML = `<div class="card"><div class="empty-state">${d.error}</div></div>`;
+    return;
+  }
+
+  const pts = d.data_points;
+  const classColor = CLASS_COLORS[d.class] || '#aaa';
+
+  container.innerHTML = `
+    <div class="scorecard-header">
+      <img src="/icons/${(d.class||'beginner').toLowerCase()}.png"
+           style="width:52px;height:52px;object-fit:contain;flex-shrink:0;"
+           onerror="this.style.display='none'">
+      <div>
+        <div class="scorecard-name">${d.name}</div>
+        <div class="scorecard-job">${d.job_name} &nbsp;·&nbsp; Rank #${d.rank}</div>
+      </div>
+    </div>
+
+    <div class="scorecard-stats">
+      <div class="stat-block blue"><div class="stat-value">${d.level}</div><div class="stat-label">Level</div></div>
+      <div class="stat-block green"><div class="stat-value">${d.levels_gained}</div><div class="stat-label">Levels Gained</div></div>
+      <div class="stat-block"><div class="stat-value">${fmtExp(d.total_exp_gained)}</div><div class="stat-label">Total Exp</div></div>
+      <div class="stat-block"><div class="stat-value">${d.fame}</div><div class="stat-label">Fame</div></div>
+      <div class="stat-block"><div class="stat-value">${d.quests}</div><div class="stat-label">Quests</div></div>
+      <div class="stat-block"><div class="stat-value">${d.cards}</div><div class="stat-label">Cards</div></div>
+      <div class="stat-block"><div class="stat-value">${d.days_tracked}d</div><div class="stat-label">Tracked</div></div>
+    </div>
+
+    <div class="grid-5">
+      <div class="card">
+        <div class="card-title">Level Progression</div>
+        <div class="chart-wrap" style="height:220px"><canvas id="sc-level"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Exp Gained Per Snapshot</div>
+        <div class="chart-wrap" style="height:220px"><canvas id="sc-exp"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Rank Progression</div>
+        <div class="chart-wrap" style="height:220px"><canvas id="sc-rank"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Quest Progression</div>
+        <div class="chart-wrap" style="height:220px"><canvas id="sc-quests"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Card Progression</div>
+        <div class="chart-wrap" style="height:220px"><canvas id="sc-cards"></canvas></div>
+      </div>
+    </div>
+  `;
+
+  const labels = pts.map(p => p.label);
+
+  makeChart('sc-level', 'line', {
+    labels,
+    datasets: [{ data: pts.map(p => p.level), borderColor: '#3498db', backgroundColor: 'rgba(52,152,219,0.1)', fill: true, tension: 0.3, pointRadius: 2 }],
+  });
+
+  makeChart('sc-exp', 'bar', {
+    labels,
+    datasets: [{ data: pts.map(p => p.exp_gained), backgroundColor: 'rgba(16,185,129,0.6)', borderColor: '#10b981', borderWidth: 1, borderRadius: 2 }],
+  });
+
+  makeChart('sc-rank', 'line', {
+    labels,
+    datasets: [{ data: pts.map(p => p.rank), borderColor: '#f59e0b', backgroundColor: 'rgba(245,158,11,0.1)', fill: true, tension: 0.3, pointRadius: 2 }],
+  }, {
+    plugins: { legend: { display: false } },
+    scales: { ...chartDefaults.scales, y: { ...chartDefaults.scales.y, reverse: true } },
+  });
+
+  makeChart('sc-quests', 'line', {
+    labels,
+    datasets: [{ data: pts.map(p => p.quests), borderColor: '#00d4ff', backgroundColor: 'rgba(0,212,255,0.1)', fill: true, tension: 0.3, pointRadius: 2 }],
+  });
+
+  makeChart('sc-cards', 'line', {
+    labels,
+    datasets: [{ data: pts.map(p => p.cards), borderColor: '#bb44ff', backgroundColor: 'rgba(187,68,255,0.1)', fill: true, tension: 0.3, pointRadius: 2 }],
+  });
+}
+
+// ── Search ────────────────────────────────────────────────────────────────────
+let searchTimer;
+const searchInput   = document.getElementById('player-search-input');
+const searchDropdown = document.getElementById('search-results-dropdown');
+
+searchInput.addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  const q = searchInput.value.trim();
+  if (q.length < 2) { searchDropdown.style.display = 'none'; return; }
+  searchTimer = setTimeout(async () => {
+    const res = await fetch(`/api/players/search?q=${encodeURIComponent(q)}`);
+    const results = await res.json();
+    if (!results.length) { searchDropdown.style.display = 'none'; return; }
+    searchDropdown.style.display = 'block';
+    searchDropdown.innerHTML = results.map(r => `
+      <div class="search-result-item" data-name="${r.name}">
+        <div class="class-dot" style="width:10px;height:10px;background:${CLASS_COLORS['Beginner']}"></div>
+        <div>
+          <div style="font-size:16px;font-weight:600">${r.name}</div>
+          <div style="font-size:14px;color:var(--muted)">Lv.${r.level} ${r.job_name}</div>
+        </div>
+      </div>
+    `).join('');
+    searchDropdown.querySelectorAll('.search-result-item').forEach(el => {
+      el.addEventListener('click', () => {
+        searchInput.value = el.dataset.name;
+        searchDropdown.style.display = 'none';
+        loadPlayer(el.dataset.name);
+      });
+    });
+  }, 200);
+});
+
+document.getElementById('player-search-btn').addEventListener('click', () => {
+  const name = searchInput.value.trim();
+  if (name) { searchDropdown.style.display = 'none'; loadPlayer(name); }
+});
+
+searchInput.addEventListener('keydown', e => {
+  if (e.key === 'Enter') { searchDropdown.style.display = 'none'; loadPlayer(searchInput.value.trim()); }
+});
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('#player-search-input') && !e.target.closest('#search-results-dropdown'))
+    searchDropdown.style.display = 'none';
+});
+
+// ── Auto-load from URL ────────────────────────────────────────────────────────
+const urlName = decodeURIComponent(window.location.pathname.replace('/player/', '').replace('/player', ''));
+if (urlName) {
+  searchInput.value = urlName;
+  loadPlayer(urlName);
+}
+</script>
+</body>
+</html>

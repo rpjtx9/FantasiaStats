@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guild — Fantasia Rankings</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0b0e1a; --surface: #111827; --card: #141d2e; --border: #1e2d47;
+  --accent: #00d4ff; --green: #10b981; --yellow: #f59e0b; --red: #ef4444;
+  --text: #e2e8f0; --muted: #64748b;
+  --warrior: #ff4444; --magician: #bb44ff; --archer: #33ff77;
+  --thief: #4488ff; --pirate: #ffaa00; --beginner: #95a5a6;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'Barlow', sans-serif; min-height: 100vh; }
+body::before {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+}
+nav {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(11,14,26,0.92); backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 32px; display: flex; align-items: center; height: 56px; gap: 24px;
+}
+.nav-logo { font-family: 'Rajdhani',sans-serif; font-size: 20px; font-weight: 700; letter-spacing: 0.1em; color: var(--accent); text-transform: uppercase; }
+.nav-logo span { color: var(--text); }
+.nav-back { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; padding: 6px 12px; border-radius: 4px; transition: color 0.15s, background 0.15s; }
+.nav-back:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+.nav-controls { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.hours-btn { background: var(--card); border: 1px solid var(--border); color: var(--muted); font-family: 'Share Tech Mono', monospace; font-size: 12px; padding: 5px 10px; border-radius: 4px; cursor: pointer; transition: all 0.15s; }
+.hours-btn:hover, .hours-btn.active { color: var(--accent); border-color: var(--accent); background: rgba(0,212,255,0.08); }
+main { max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
+.page-header { margin-bottom: 28px; }
+.page-title { font-family: 'Rajdhani', sans-serif; font-size: 32px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text); }
+.page-sub { font-family: 'Share Tech Mono', monospace; font-size: 14px; color: var(--muted); margin-top: 6px; }
+.guild-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; }
+@media (max-width: 1100px) { .guild-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px)  { .guild-grid { grid-template-columns: 1fr; } }
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; position: relative; overflow: hidden; }
+.card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, var(--accent), transparent); opacity: 0.3; }
+.guild-col-title { font-family: 'Rajdhani', sans-serif; font-size: 19px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding-bottom: 12px; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+.guild-col-title.exp    { color: var(--green); }
+.guild-col-title.lvl    { color: var(--red); }
+.guild-col-title.quests { color: var(--accent); }
+.guild-col-title.cards  { color: var(--yellow); }
+.player-row { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,0.03); }
+.player-row:last-child { border-bottom: none; }
+.player-rank { font-family: 'Share Tech Mono', monospace; font-size: 14px; color: var(--muted); width: 18px; flex-shrink: 0; }
+.player-info { flex: 1; min-width: 0; }
+.player-name { font-size: 16px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.player-sub  { font-size: 13px; color: var(--muted); margin-top: 1px; }
+.player-exp  { font-family: 'Share Tech Mono', monospace; font-size: 15px; flex-shrink: 0; text-align: right; }
+.empty-state { color: var(--muted); font-size: 14px; text-align: center; padding: 24px 0; }
+.loading { text-align: center; padding: 60px; color: var(--muted); font-family: 'Share Tech Mono', monospace; font-size: 14px; }
+.loading::after { content: ''; animation: dots 1.2s steps(3,end) infinite; }
+@keyframes dots { 0%,20%{content:'.'} 40%,60%{content:'..'} 80%,100%{content:'...'} }
+</style>
+</head>
+<body>
+<nav>
+  <div class="nav-logo">FantasiaStats<span>.ms</span></div>
+  <a href="/" class="nav-back">← Dashboard</a>
+  <div style="display:flex;align-items:center;gap:8px;margin-left:16px;">
+    <span style="font-size:14px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;">Guild:</span>
+    <select id="guild-select" style="background:var(--card);border:1px solid var(--border);color:var(--text);font-family:'Barlow',sans-serif;font-size:14px;padding:5px 10px;border-radius:4px;cursor:pointer;outline:none;">
+      <option>Loading...</option>
+    </select>
+  </div>
+  <div class="nav-controls">
+    <span style="font-size:14px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-right:4px;">Window:</span>
+    <button class="hours-btn" data-hours="12">12h</button>
+    <button class="hours-btn active" data-hours="24">24h</button>
+    <button class="hours-btn" data-hours="48">48h</button>
+    <button class="hours-btn" data-hours="168">7d</button>
+  </div>
+</nav>
+<main>
+  <div class="page-header">
+    <div class="page-title" id="guild-title">Guild</div>
+    <div class="page-sub" id="guild-sub">—</div>
+  </div>
+  <div class="guild-grid" id="guild-content">
+    <div class="loading" style="grid-column:1/-1">Loading guild data</div>
+  </div>
+</main>
+<script>
+let currentHours = 24;
+let currentGuild = '';
+
+const CLASS_COLORS = {
+  Beginner: '#95a5a6', Warrior: '#ff4444', Magician: '#bb44ff',
+  Archer: '#33ff77', Thief: '#4488ff', Pirate: '#ffaa00',
+};
+
+function fmtExp(n) {
+  if (n >= 1_000_000_000) return (n/1e9).toFixed(2)+'B';
+  if (n >= 1_000_000) return (n/1e6).toFixed(2)+'M';
+  if (n >= 1_000) return (n/1e3).toFixed(1)+'K';
+  return n.toLocaleString();
+}
+
+async function loadGuildList() {
+  const res = await fetch('/api/guilds');
+  const guilds = await res.json();
+  const select = document.getElementById('guild-select');
+  if (!guilds.length) {
+    select.innerHTML = '<option>No guilds found</option>';
+    return;
+  }
+  select.innerHTML = guilds.map(g => `<option value="${g}">${g}</option>`).join('');
+  currentGuild = guilds[0];
+  select.addEventListener('change', () => {
+    currentGuild = select.value;
+    loadGuild();
+  });
+  loadGuild();
+}
+
+async function loadGuild() {
+  document.getElementById('guild-content').innerHTML = '<div class="loading" style="grid-column:1/-1">Loading</div>';
+  const params = new URLSearchParams();
+  if (currentHours) params.set('hours', currentHours);
+  if (currentGuild) params.set('guild', currentGuild);
+  const res = await fetch(`/api/guild?${params}`);
+  if (!res.ok) {
+    document.getElementById('guild-content').innerHTML = '<div class="empty-state" style="grid-column:1/-1">guilds.py not found or not enough data.</div>';
+    return;
+  }
+  const d = await res.json();
+
+  document.getElementById('guild-title').textContent = d.guild_name || 'Guild';
+  document.getElementById('guild-sub').textContent = `Last ${d.window_label}`;
+
+  const cols = [
+    { key: 'top_exp',    title: 'Exp Gained', cls: 'exp',    fmt: p => `+${fmtExp(p.exp_gained)}`,  color: 'var(--green)' },
+    { key: 'top_levels', title: 'Levels',     cls: 'lvl',    fmt: p => `+${p.level_delta}`,          color: 'var(--red)' },
+    { key: 'top_quests', title: 'Quests',     cls: 'quests', fmt: p => `+${p.quest_delta}`,           color: 'var(--accent)' },
+    { key: 'top_cards',  title: 'Cards',      cls: 'cards',  fmt: p => `+${p.card_delta}`,            color: 'var(--yellow)' },
+  ];
+
+  document.getElementById('guild-content').innerHTML = cols.map(col => `
+    <div class="card">
+      <div class="guild-col-title ${col.cls}">${col.title}</div>
+      ${(d[col.key] || []).map((p, i) => `
+        <div class="player-row">
+          <div class="player-rank">${i+1}</div>
+          <img src="/icons/${(p.class||'beginner').toLowerCase()}.png"
+               style="width:26px;height:26px;object-fit:contain;flex-shrink:0;"
+               onerror="this.style.display='none'">
+          <div class="player-info">
+            <div class="player-name">${p.name}</div>
+            <div class="player-sub">Lv.${p.level} ${p.job_name}</div>
+          </div>
+          <div class="player-exp" style="color:${col.color}">${col.fmt(p)}</div>
+        </div>
+      `).join('') || '<div class="empty-state">No activity</div>'}
+    </div>
+  `).join('');
+}
+
+document.querySelectorAll('.hours-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.hours-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentHours = btn.dataset.hours ? parseInt(btn.dataset.hours) : null;
+    loadGuild();
+  });
+});
+
+loadGuildList();
+</script>
+</body>
+</html>

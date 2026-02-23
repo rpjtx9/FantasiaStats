@@ -1,0 +1,5 @@
+data/snapshots/
+data/charts/
+data/fantasia.db
+__pycache__/
+*.pyc
