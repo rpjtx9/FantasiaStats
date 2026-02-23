@@ -1,0 +1,16 @@
+version: "3.9"
+
+services:
+  fantasia:
+    build: .
+    container_name: fantasia-rankings
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    volumes:
+      # Mount your persistent data folder from the host into the container.
+      # Change the left side to wherever you want to store data on your server,
+      # e.g. /home/youruser/fantasia-data or /opt/fantasia/data
+      - /opt/fantasia/data:/data
+    environment:
+      - DATA_DIR=/data
