@@ -11,6 +11,6 @@ services:
       # Mount your persistent data folder from the host into the container.
       # Change the left side to wherever you want to store data on your server,
       # e.g. /home/youruser/fantasia-data or /opt/fantasia/data
-      - /opt/fantasia/data:/data
+      - /soldier_dock/cosmos/fantasia/FantasiaStats/data:/data
     environment:
       - DATA_DIR=/data
