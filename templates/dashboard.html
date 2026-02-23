@@ -3,10 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FantasiaStats.MS</title>
+<title>FantasiaStats.win</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 <style>
 :root {
   --bg:        #0b0e1a;
@@ -439,7 +440,7 @@ main { max-width: 1600px; margin: 0 auto; padding: 32px 24px; }
 <body>
 
 <nav>
-  <div class="nav-logo">FantasiaStats<span>.ms</span></div>
+  <div class="nav-logo">FantasiaStats<span>.win</span></div>
   <div class="nav-links">
     <a href="#activity" class="active">Activity</a>
     <a href="#levels">Levels</a>
@@ -553,6 +554,7 @@ main { max-width: 1600px; margin: 0 auto; padding: 32px 24px; }
 
 <script>
 // ─── State ───────────────────────────────────────────────────────────────────
+Chart.register(ChartDataLabels);
 let currentHours = 24;
 const charts = {};
 
@@ -649,7 +651,14 @@ async function loadClassDist() {
     indexAxis: 'y',
     plugins: {
       legend: { display: false },
-      tooltip: { callbacks: { label: ctx => ` ${ctx.raw} players` } }
+      tooltip: { callbacks: { label: ctx => ` ${ctx.raw} players` } },
+      datalabels: {
+        anchor: 'end',
+        align: 'right',
+        color: '#e2e8f0',
+        font: { family: 'Share Tech Mono', size: 11 },
+        formatter: val => val > 0 ? val : '',
+      },
     },
     scales: {
       ...chartDefaults.scales,
@@ -666,28 +675,63 @@ async function loadActiveDist() {
   const data = await res.json();
   if (!data.labels || !data.labels.length) return;
 
-  makeChart('chart-active-level-dist', 'bar', {
-    labels: data.labels,
-    datasets: data.series.map(s => ({
-      label: s.name,
-      data: s.data,
-      backgroundColor: s.color + '99',
-      borderColor: s.color,
-      borderWidth: 1,
-      borderRadius: 2,
-    })),
-  }, {
-    plugins: {
-      legend: {
-        display: true,
-        position: 'bottom',
-        labels: { color: '#64748b', font: { family: 'Barlow', size: 14 }, boxWidth: 10, padding: 12 },
-      },
-      tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.raw}` } },
+  const stackSumPlugin = {
+    id: 'stackSumLabels',
+    afterDatasetsDraw(chart) {
+      const { ctx, data, scales: { x, y } } = chart;
+      const labels = data.labels;
+      const totals = labels.map((_, i) =>
+        data.datasets.reduce((sum, ds) => sum + (ds.data[i] || 0), 0)
+      );
+      ctx.save();
+      ctx.font = '11px "Share Tech Mono", monospace';
+      ctx.fillStyle = '#e2e8f0';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      labels.forEach((_, i) => {
+        const total = totals[i];
+        if (total <= 0) return;
+        const xPos = x.getPixelForValue(i);
+        const yPos = y.getPixelForValue(total);
+        ctx.fillText(total, xPos, yPos - 4);
+      });
+      ctx.restore();
+    }
+  };
+
+  if (charts['chart-active-level-dist']) charts['chart-active-level-dist'].destroy();
+  const ctx = document.getElementById('chart-active-level-dist');
+  if (!ctx) return;
+  charts['chart-active-level-dist'] = new Chart(ctx, {
+    type: 'bar',
+    plugins: [stackSumPlugin],
+    data: {
+      labels: data.labels,
+      datasets: data.series.map(s => ({
+        label: s.name,
+        data: s.data,
+        backgroundColor: s.color + '99',
+        borderColor: s.color,
+        borderWidth: 1,
+        borderRadius: 2,
+      })),
     },
-    scales: {
-      x: { stacked: true, ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 13 }, maxRotation: 45 }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' } },
-      y: { stacked: true, ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 13 } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' } },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: true,
+          position: 'bottom',
+          labels: { color: '#64748b', font: { family: 'Barlow', size: 14 }, boxWidth: 10, padding: 12 },
+        },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.raw}` } },
+        datalabels: { display: false },
+      },
+      scales: {
+        x: { stacked: true, ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 13 }, maxRotation: 45 }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' } },
+        y: { stacked: true, ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 13 } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' } },
+      },
     },
   });
 }
@@ -708,12 +752,17 @@ async function loadActivity() {
   document.getElementById('stat-new').textContent = d.new_count.toLocaleString();
 
   // Draw active players by class bar chart
-  const classLabels = Object.keys(d.class_counts);
+  const sortedActive = Object.entries(d.class_counts).sort((a, b) => {
+    if (a[0] === 'Beginner') return -1;
+    if (b[0] === 'Beginner') return 1;
+    return b[1] - a[1];
+  });
+  const classLabels = sortedActive.map(x => x[0]);
   const classColors = classLabels.map(l => CLASS_COLORS[l] || '#aaa');
   makeChart('chart-active-dist', 'bar', {
     labels: classLabels,
     datasets: [{
-      data: Object.values(d.class_counts),
+      data: sortedActive.map(x => x[1]),
       backgroundColor: classColors.map(c => c + 'bb'),
       borderColor: classColors,
       borderWidth: 1,
@@ -723,20 +772,32 @@ async function loadActivity() {
     plugins: {
       legend: { display: false },
       tooltip: { callbacks: { label: ctx => ` ${ctx.raw} players` } },
+      datalabels: {
+        anchor: 'end',
+        align: 'end',
+        color: '#e2e8f0',
+        font: { family: 'Share Tech Mono', size: 11 },
+        formatter: val => val > 0 ? val : '',
+      },
     },
     scales: {
       x: { ticks: { color: '#e2e8f0', font: { family: 'Barlow', size: 15, weight: '500' } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' } },
-      y: { ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 13 } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' } },
+      y: { grace: '10%', ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 13 } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' } },
     },
   });
 
   // Draw new players by class bar chart
-  const newClassLabels = Object.keys(d.new_class_counts);
+  const sortedNew = Object.entries(d.new_class_counts).sort((a, b) => {
+    if (a[0] === 'Beginner') return -1;
+    if (b[0] === 'Beginner') return 1;
+    return b[1] - a[1];
+  });
+  const newClassLabels = sortedNew.map(x => x[0]);
   const newClassColors = newClassLabels.map(l => CLASS_COLORS[l] || '#aaa');
   makeChart('chart-new-dist', 'bar', {
     labels: newClassLabels,
     datasets: [{
-      data: Object.values(d.new_class_counts),
+      data: sortedNew.map(x => x[1]),
       backgroundColor: newClassColors.map(c => c + 'bb'),
       borderColor: newClassColors,
       borderWidth: 1,
@@ -746,10 +807,17 @@ async function loadActivity() {
     plugins: {
       legend: { display: false },
       tooltip: { callbacks: { label: ctx => ` ${ctx.raw} players` } },
+      datalabels: {
+        anchor: 'end',
+        align: 'end',
+        color: '#e2e8f0',
+        font: { family: 'Share Tech Mono', size: 11 },
+        formatter: val => val > 0 ? val : '',
+      },
     },
     scales: {
       x: { ticks: { color: '#e2e8f0', font: { family: 'Barlow', size: 15, weight: '500' } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' } },
-      y: { ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 13 } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' } },
+      y: { grace: '10%', ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 13 } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' } },
     },
   });
 
