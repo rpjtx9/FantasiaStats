@@ -2,7 +2,8 @@ import sqlite3
 from pathlib import Path
 from datetime import datetime
 
-DB_PATH = Path("data/fantasia.db")
+import os
+DB_PATH = Path(os.environ.get("DATA_DIR", "data")) / "fantasia.db"
 
 def get_connection():
     conn = sqlite3.connect(DB_PATH)
