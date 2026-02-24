@@ -1,6 +1,7 @@
 import requests
 import json
 import time
+import os
 from datetime import datetime
 from pathlib import Path
 
@@ -41,8 +42,8 @@ def fetch_all_players():
     return all_players
 
 def save_snapshot(players):
-    data_dir = Path("data/snapshots")
-    data_dir.mkdir(exist_ok=True)
+    data_dir = Path(os.environ.get("DATA_DIR", "data")) / "snapshots"
+    data_dir.mkdir(parents=True, exist_ok=True)
     
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     filename = data_dir / f"rankings_{timestamp}.json"
@@ -58,7 +59,7 @@ def load_snapshot(filepath):
         return json.load(f)
 
 def get_latest_snapshots(n=2):
-    data_dir = Path("data/snapshots")
+    data_dir = Path(os.environ.get("DATA_DIR", "data")) / "snapshots"
     snapshots = sorted(data_dir.glob("rankings_*.json"), reverse=True)
     return snapshots[:n]
 
