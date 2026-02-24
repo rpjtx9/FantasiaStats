@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FantasiaStats.win</title>
+<title>FantasiaStats.MS</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -440,7 +440,7 @@ main { max-width: 1600px; margin: 0 auto; padding: 32px 24px; }
 <body>
 
 <nav>
-  <div class="nav-logo">FantasiaStats<span>.win</span></div>
+  <div class="nav-logo">FantasiaStats<span>.ms</span></div>
   <div class="nav-links">
     <a href="#activity" class="active">Activity</a>
     <a href="#levels">Levels</a>
@@ -681,7 +681,11 @@ async function loadActiveDist() {
       const { ctx, data, scales: { x, y } } = chart;
       const labels = data.labels;
       const totals = labels.map((_, i) =>
-        data.datasets.reduce((sum, ds) => sum + (ds.data[i] || 0), 0)
+        data.datasets.reduce((sum, ds, dsIndex) => {
+          const meta = chart.getDatasetMeta(dsIndex);
+          if (meta.hidden) return sum;
+          return sum + (ds.data[i] || 0);
+        }, 0)
       );
       ctx.save();
       ctx.font = '11px "Share Tech Mono", monospace';
@@ -730,7 +734,7 @@ async function loadActiveDist() {
       },
       scales: {
         x: { stacked: true, ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 13 }, maxRotation: 45 }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' } },
-        y: { stacked: true, grace: '10%', ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 13 } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' } },
+        y: { stacked: true, ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 13 } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' } },
       },
     },
   });
@@ -782,7 +786,7 @@ async function loadActivity() {
     },
     scales: {
       x: { ticks: { color: '#e2e8f0', font: { family: 'Barlow', size: 15, weight: '500' } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' } },
-      y: { grace: '10%', ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 13 } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' } },
+      y: { grace: '15%', ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 13 } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' } },
     },
   });
 
@@ -817,7 +821,7 @@ async function loadActivity() {
     },
     scales: {
       x: { ticks: { color: '#e2e8f0', font: { family: 'Barlow', size: 15, weight: '500' } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' } },
-      y: { grace: '10%', ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 13 } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' } },
+      y: { grace: '15%', ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 13 } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' } },
     },
   });
 

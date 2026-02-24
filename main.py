@@ -4,8 +4,11 @@ from datetime import datetime
 from pathlib import Path
 from fetch import fetch_all_players, save_snapshot, load_snapshot, get_latest_snapshots
 from analyze import level_distribution, level_distribution_by_class_grouped, job_popularity, active_players, summary
-from visualize import plot_level_distribution, plot_level_distribution_by_class, plot_activity_card, plot_server_health, plot_retention, plot_guild_card, plot_active_player_distribution
 from database import initialize_db, ingest_snapshot
+
+def get_visualize():
+    from visualize import plot_level_distribution, plot_level_distribution_by_class, plot_activity_card, plot_server_health, plot_retention, plot_guild_card, plot_active_player_distribution
+    return plot_level_distribution, plot_level_distribution_by_class, plot_activity_card, plot_server_health, plot_retention, plot_guild_card, plot_active_player_distribution
 
 def run_fetch():
     print("=== Fetching Rankings ===")
@@ -107,6 +110,7 @@ def main():
     if args.all:
         run_fetch()
         run_analyze()
+        plot_level_distribution, plot_level_distribution_by_class, plot_activity_card, plot_server_health, plot_retention, plot_guild_card, plot_active_player_distribution = get_visualize()
         plot_level_distribution()
         plot_level_distribution_by_class()
         plot_activity_card(hours=args.hours)
@@ -118,10 +122,12 @@ def main():
         run_fetch()
     elif args.analyze:
         run_analyze()
+        plot_level_distribution, plot_level_distribution_by_class, plot_activity_card, plot_server_health, plot_retention, plot_guild_card, plot_active_player_distribution = get_visualize()
         plot_activity_card(hours=args.hours)
     elif args.backfill:
         run_backfill()
     elif args.visualize:
+        plot_level_distribution, plot_level_distribution_by_class, plot_activity_card, plot_server_health, plot_retention, plot_guild_card, plot_active_player_distribution = get_visualize()
         plot_level_distribution()
         plot_level_distribution_by_class()
         plot_activity_card(hours=args.hours)
