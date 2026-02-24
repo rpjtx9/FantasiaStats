@@ -11,7 +11,7 @@ GUILDS = {
         "Kaspa", "DaWei", "Needle", "BamanEthereum", "Zora", "Lecco", "Gumby",
         "Ljsasonl", "FireFist", "Oban", "Nightnoor", "Leroy", "HARPER", "iLucas",
         "IPhone16Pro", "peet", "yoni", "SinDee", "SacrificeGuy", "Yvannova", "Suga", "Kenzow",
-        "Adeesin", "Bobdor2", "Efralen02", "Crodie",
+        "Adeesin", "Bobdor2", "Efralen02", "Crodie", "Celeste", "Marin",  "irriducibili",
     ],
     # Add more guilds here:
     # "AnotherGuild": ["Player1", "Player2", ...],
