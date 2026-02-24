@@ -125,6 +125,23 @@ const CLASS_COLORS = {
   Archer: '#33ff77', Thief: '#4477ff', Pirate: '#ffaa00',
 };
 
+// Per-job colors matching class branches from visualize.py
+const JOB_COLORS = {
+  0:   '#95a5a6',
+  100: '#ff4444', 110: '#ff4444', 111: '#ff8800', 112: '#ffcc00',
+  120: '#cc44ff', 121: '#8800ff', 122: '#4400cc',
+  130: '#ff44aa', 131: '#cc0055', 132: '#880033',
+  200: '#bb44ff', 210: '#ff6600', 211: '#ff0000', 212: '#880000',
+  220: '#44aaff', 221: '#0066ff', 222: '#0033cc',
+  230: '#ffffff', 231: '#cccccc', 232: '#999999',
+  300: '#33ff77', 310: '#33ff77', 311: '#00cc44', 312: '#008833',
+  320: '#ffff44', 321: '#cccc00', 322: '#888800',
+  400: '#4488ff', 410: '#4488ff', 411: '#0044cc', 412: '#002288',
+  420: '#ff8844', 421: '#cc4400', 422: '#882200',
+  500: '#ffaa00', 510: '#ffdd00', 511: '#ff4400', 512: '#880000',
+  520: '#00ffee', 521: '#0088ff', 522: '#cc00ff',
+};
+
 const chartDefaults = {
   responsive: true,
   maintainAspectRatio: false,
@@ -154,20 +171,20 @@ function renderPopChart(jobData, filterClass) {
   if (filterClass === 'All') {
     for (const [cls, jobs] of Object.entries(jobData)) {
       for (const j of jobs) {
-        if (j.count > 0) entries.push({ label: j.job_name, count: j.count, class: cls });
+        if (j.count > 0) entries.push({ label: j.job_name, count: j.count, class: cls, job_id: j.job_id });
       }
     }
   } else {
     entries = (jobData[filterClass] || [])
       .filter(j => j.count > 0)
-      .map(j => ({ label: j.job_name, count: j.count, class: filterClass }));
+      .map(j => ({ label: j.job_name, count: j.count, class: filterClass, job_id: j.job_id }));
   }
 
   entries.sort((a, b) => b.count - a.count);
 
   const labels  = entries.map(e => e.label);
   const counts  = entries.map(e => e.count);
-  const colors  = entries.map(e => CLASS_COLORS[e.class] || '#aaa');
+  const colors  = entries.map(e => JOB_COLORS[e.job_id] || CLASS_COLORS[e.class] || '#aaa');
   const ctx = document.getElementById('chart-job-pop');
   if (!ctx) return;
 
@@ -224,7 +241,7 @@ async function renderTrendsChart(filterClass) {
     data: {
       labels: data.labels,
       datasets: activeSeries.map(s => {
-        const color = CLASS_COLORS[s.class] || '#aaa';
+        const color = JOB_COLORS[s.job_id] || CLASS_COLORS[s.class] || '#aaa';
         return {
           label: s.job_name,
           data: s.data,
@@ -276,7 +293,7 @@ function renderBreakdown(jobData, filterClass) {
             <div class="job-card">
               <span class="job-name">${j.job_name}</span>
               <span>
-                <span class="job-count" style="color:${color}">${j.count.toLocaleString()}</span>
+                <span class="job-count" style="color:${JOB_COLORS[j.job_id] || color}">${j.count.toLocaleString()}</span>
                 <span class="job-pct">${((j.count/totalAll)*100).toFixed(1)}%</span>
               </span>
             </div>

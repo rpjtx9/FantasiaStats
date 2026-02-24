@@ -104,7 +104,14 @@ nav {
 .nav-links a:hover { color: var(--text); background: rgba(255,255,255,0.05); }
 .nav-links a.active { color: var(--accent); background: rgba(0,212,255,0.08); }
 
-.nav-controls {
+.chart-hint {
+  text-align: center;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 8px;
+  letter-spacing: 0.04em;
+}
   display: flex;
   align-items: center;
   gap: 6px;
@@ -684,6 +691,7 @@ async function loadClassDist() {
     datasets: [{
       data: counts,
       backgroundColor: colors.map(c => c + '99'),
+      hoverBackgroundColor: colors.map(c => c + 'cc'),
       borderColor: colors,
       borderWidth: 1,
       borderRadius: 4,
@@ -713,6 +721,14 @@ async function loadClassDist() {
       y: { ...chartDefaults.scales.y, ticks: { color: '#e2e8f0', font: { family: 'Barlow', size: 15, weight: '500' } } },
     },
   });
+  // Hint text below chart
+  const wrap = document.getElementById('chart-class-dist').parentElement;
+  if (!wrap.querySelector('.chart-hint')) {
+    const hint = document.createElement('div');
+    hint.className = 'chart-hint';
+    hint.textContent = 'Click a class to explore job breakdown →';
+    wrap.appendChild(hint);
+  }
 }
 
 // ─── Active Level Distribution (stacked by class) ────────────────────────────
