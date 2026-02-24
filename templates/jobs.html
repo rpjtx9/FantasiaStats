@@ -171,12 +171,12 @@ function renderPopChart(jobData, filterClass) {
   if (filterClass === 'All') {
     for (const [cls, jobs] of Object.entries(jobData)) {
       for (const j of jobs) {
-        if (j.count > 0) entries.push({ label: j.job_name, count: j.count, class: cls, job_id: j.job_id });
+        if (j.count > 0 && j.job_id % 100 !== 0) entries.push({ label: j.job_name, count: j.count, class: cls, job_id: j.job_id });
       }
     }
   } else {
     entries = (jobData[filterClass] || [])
-      .filter(j => j.count > 0)
+      .filter(j => j.count > 0 && j.job_id % 100 !== 0)
       .map(j => ({ label: j.job_name, count: j.count, class: filterClass, job_id: j.job_id }));
   }
 
@@ -230,8 +230,8 @@ async function renderTrendsChart(filterClass) {
   if (!res.ok) return;
   const data = await res.json();
 
-  // Only show jobs that have any non-zero data
-  const activeSeries = data.series.filter(s => s.data.some(v => v > 0));
+  // Only show jobs that have any non-zero data, excluding base class jobs
+  const activeSeries = data.series.filter(s => s.data.some(v => v > 0) && s.job_id % 100 !== 0);
 
   const ctx = document.getElementById('chart-job-trends');
   if (!ctx) return;
