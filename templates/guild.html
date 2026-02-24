@@ -30,9 +30,12 @@ nav {
 .nav-logo span { color: var(--text); }
 .nav-back { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; padding: 6px 12px; border-radius: 4px; transition: color 0.15s, background 0.15s; }
 .nav-back:hover { color: var(--text); background: rgba(255,255,255,0.05); }
-.nav-controls { display: flex; align-items: center; gap: 8px; margin-left: auto; }
-.hours-btn { background: var(--card); border: 1px solid var(--border); color: var(--muted); font-family: 'Share Tech Mono', monospace; font-size: 12px; padding: 5px 10px; border-radius: 4px; cursor: pointer; transition: all 0.15s; }
-.hours-btn:hover, .hours-btn.active { color: var(--accent); border-color: var(--accent); background: rgba(0,212,255,0.08); }
+.nav-controls { display: flex; align-items: center; gap: 6px; margin-left: auto; flex-wrap: wrap; }
+.preset-btn { background: var(--card); border: 1px solid var(--border); color: var(--muted); font-family: 'Share Tech Mono', monospace; font-size: 12px; padding: 5px 9px; border-radius: 4px; cursor: pointer; transition: all 0.15s; }
+.preset-btn:hover, .preset-btn.active { color: var(--accent); border-color: var(--accent); background: rgba(0,212,255,0.08); }
+.date-sep { color: var(--muted); font-size: 13px; padding: 0 2px; }
+.date-input { background: var(--card); border: 1px solid var(--border); color: var(--text); font-family: 'Share Tech Mono', monospace; font-size: 12px; padding: 5px 8px; border-radius: 4px; cursor: pointer; outline: none; transition: border-color 0.15s; color-scheme: dark; }
+.date-input:focus { border-color: var(--accent); }
 main { max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
 .page-header { margin-bottom: 28px; }
 .page-title { font-family: 'Rajdhani', sans-serif; font-size: 32px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text); }
@@ -71,11 +74,17 @@ main { max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
     </select>
   </div>
   <div class="nav-controls">
-    <span style="font-size:14px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-right:4px;">Window:</span>
-    <button class="hours-btn" data-hours="12">12h</button>
-    <button class="hours-btn active" data-hours="24">24h</button>
-    <button class="hours-btn" data-hours="48">48h</button>
-    <button class="hours-btn" data-hours="168">7d</button>
+    <span style="font-size:13px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-right:2px;">Window:</span>
+    <button class="preset-btn" data-hours="12">12h</button>
+    <button class="preset-btn active" data-hours="24">24h</button>
+    <button class="preset-btn" data-hours="48">48h</button>
+    <button class="preset-btn" data-hours="168">7d</button>
+    <button class="preset-btn" data-hours="720">30d</button>
+    <button class="preset-btn" data-hours="0">All</button>
+    <span class="date-sep">|</span>
+    <input type="date" id="date-start" class="date-input">
+    <span class="date-sep">→</span>
+    <input type="date" id="date-end" class="date-input">
   </div>
 </nav>
 <main>
@@ -89,7 +98,21 @@ main { max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
 </main>
 <script>
 let currentHours = 24;
+let currentStart = null;
+let currentEnd   = null;
 let currentGuild = '';
+
+function buildParams() {
+  const p = new URLSearchParams();
+  if (currentStart && currentEnd) {
+    p.set('start', currentStart);
+    p.set('end', currentEnd);
+  } else if (currentHours) {
+    p.set('hours', currentHours);
+  }
+  if (currentGuild) p.set('guild', currentGuild);
+  return p.toString() ? '?' + p.toString() : '';
+}
 
 const CLASS_COLORS = {
   Beginner: '#95a5a6', Warrior: '#ff4444', Magician: '#bb44ff',
@@ -122,10 +145,7 @@ async function loadGuildList() {
 
 async function loadGuild() {
   document.getElementById('guild-content').innerHTML = '<div class="loading" style="grid-column:1/-1">Loading</div>';
-  const params = new URLSearchParams();
-  if (currentHours) params.set('hours', currentHours);
-  if (currentGuild) params.set('guild', currentGuild);
-  const res = await fetch(`/api/guild?${params}`);
+  const res = await fetch(`/api/guild${buildParams()}`);
   if (!res.ok) {
     document.getElementById('guild-content').innerHTML = '<div class="empty-state" style="grid-column:1/-1">guilds.py not found or not enough data.</div>';
     return;
@@ -162,15 +182,48 @@ async function loadGuild() {
   `).join('');
 }
 
-document.querySelectorAll('.hours-btn').forEach(btn => {
+document.querySelectorAll('.preset-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.hours-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    currentHours = btn.dataset.hours ? parseInt(btn.dataset.hours) : null;
+    const h = parseInt(btn.dataset.hours);
+    currentHours = h || null;
+    currentStart = null;
+    currentEnd   = null;
+    document.getElementById('date-start').value = '';
+    document.getElementById('date-end').value   = '';
     loadGuild();
   });
 });
 
+async function initDatePickers() {
+  const res = await fetch('/api/snapshot_range');
+  if (!res.ok) return;
+  const range = await res.json();
+  const startEl = document.getElementById('date-start');
+  const endEl   = document.getElementById('date-end');
+  startEl.min = range.min;
+  startEl.max = range.max;
+  endEl.min   = range.min;
+  endEl.max   = range.max;
+  endEl.value = range.max;
+
+  function onDateChange() {
+    const s = startEl.value;
+    const e = endEl.value;
+    if (s && e && s <= e) {
+      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+      currentHours = null;
+      currentStart = s;
+      currentEnd   = e;
+      loadGuild();
+    }
+  }
+  startEl.addEventListener('change', onDateChange);
+  endEl.addEventListener('change', onDateChange);
+}
+
+initDatePickers();
 loadGuildList();
 </script>
 </body>

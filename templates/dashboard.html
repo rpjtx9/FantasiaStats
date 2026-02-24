@@ -107,26 +107,48 @@ nav {
 .nav-controls {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
+  flex-wrap: wrap;
 }
 
-.hours-btn {
+.preset-btn {
   background: var(--card);
   border: 1px solid var(--border);
   color: var(--muted);
   font-family: 'Share Tech Mono', monospace;
-  font-size: 15px;
-  padding: 5px 10px;
+  font-size: 13px;
+  padding: 5px 9px;
   border-radius: 4px;
   cursor: pointer;
   transition: all 0.15s;
 }
-.hours-btn:hover, .hours-btn.active {
+.preset-btn:hover, .preset-btn.active {
   color: var(--accent);
   border-color: var(--accent);
   background: rgba(0,212,255,0.08);
 }
+
+.date-sep {
+  color: var(--muted);
+  font-size: 13px;
+  padding: 0 2px;
+}
+
+.date-input {
+  background: var(--card);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 13px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.15s;
+  color-scheme: dark;
+}
+.date-input:focus { border-color: var(--accent); }
 
 /* ── Main layout ── */
 main { max-width: 1600px; margin: 0 auto; padding: 32px 24px; }
@@ -440,7 +462,7 @@ main { max-width: 1600px; margin: 0 auto; padding: 32px 24px; }
 <body>
 
 <nav>
-  <div class="nav-logo">FantasiaStats<span>.ms</span></div>
+  <div class="nav-logo">FantasiaStats<span>.win</span></div>
   <div class="nav-links">
     <a href="#activity" class="active">Activity</a>
     <a href="#levels">Levels</a>
@@ -450,11 +472,17 @@ main { max-width: 1600px; margin: 0 auto; padding: 32px 24px; }
     <a href="/player">Player Lookup ↗</a>
   </div>
   <div class="nav-controls">
-    <span style="font-size: 14px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-right:4px;">Window:</span>
-    <button class="hours-btn" data-hours="12">12h</button>
-    <button class="hours-btn active" data-hours="24">24h</button>
-    <button class="hours-btn" data-hours="48">48h</button>
-    <button class="hours-btn" data-hours="168">7d</button>
+    <span style="font-size:13px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-right:2px;">Window:</span>
+    <button class="preset-btn" data-hours="12">12h</button>
+    <button class="preset-btn active" data-hours="24">24h</button>
+    <button class="preset-btn" data-hours="48">48h</button>
+    <button class="preset-btn" data-hours="168">7d</button>
+    <button class="preset-btn" data-hours="720">30d</button>
+    <button class="preset-btn" data-hours="0">All</button>
+    <span class="date-sep">|</span>
+    <input type="date" id="date-start" class="date-input">
+    <span class="date-sep">→</span>
+    <input type="date" id="date-end" class="date-input">
   </div>
 </nav>
 
@@ -556,6 +584,19 @@ main { max-width: 1600px; margin: 0 auto; padding: 32px 24px; }
 // ─── State ───────────────────────────────────────────────────────────────────
 Chart.register(ChartDataLabels);
 let currentHours = 24;
+let currentStart = null;
+let currentEnd   = null;
+
+function buildParams() {
+  const p = new URLSearchParams();
+  if (currentStart && currentEnd) {
+    p.set('start', currentStart);
+    p.set('end', currentEnd);
+  } else if (currentHours) {
+    p.set('hours', currentHours);
+  }
+  return p.toString() ? '?' + p.toString() : '';
+}
 const charts = {};
 
 const CLASS_COLORS = {
@@ -669,7 +710,7 @@ async function loadClassDist() {
 
 // ─── Active Level Distribution (stacked by class) ────────────────────────────
 async function loadActiveDist() {
-  const url = '/api/active_distribution' + (currentHours ? `?hours=${currentHours}` : '');
+  const url = '/api/active_distribution' + buildParams();
   const res = await fetch(url);
   if (!res.ok) return;
   const data = await res.json();
@@ -734,7 +775,7 @@ async function loadActiveDist() {
       },
       scales: {
         x: { stacked: true, ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 13 }, maxRotation: 45 }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' } },
-        y: { stacked: true, grace: '15%', ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 13 } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' } },
+        y: { stacked: true, ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 13 } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' } },
       },
     },
   });
@@ -742,7 +783,7 @@ async function loadActiveDist() {
 
 // ─── Activity Card ────────────────────────────────────────────────────────────
 async function loadActivity() {
-  const url = '/api/activity' + (currentHours ? `?hours=${currentHours}` : '');
+  const url = '/api/activity' + buildParams();
   const res = await fetch(url);
   if (!res.ok) {
     document.getElementById('activity-tiers').innerHTML = '<div class="empty-state">Need at least two snapshots to show activity.</div>';
@@ -926,15 +967,49 @@ async function loadRetention() {
   document.getElementById('retention-content').innerHTML = html;
 }
 
-// ─── Hours buttons ────────────────────────────────────────────────────────────
-document.querySelectorAll('.hours-btn').forEach(btn => {
+// ─── Preset buttons ───────────────────────────────────────────────────────────
+document.querySelectorAll('.preset-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    document.querySelectorAll('.hours-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    currentHours = btn.dataset.hours ? parseInt(btn.dataset.hours) : null;
+    const h = parseInt(btn.dataset.hours);
+    currentHours = h || null;
+    currentStart = null;
+    currentEnd   = null;
+    document.getElementById('date-start').value = '';
+    document.getElementById('date-end').value   = '';
     reloadAll();
   });
 });
+
+// ─── Date pickers ─────────────────────────────────────────────────────────────
+async function initDatePickers() {
+  const res = await fetch('/api/snapshot_range');
+  if (!res.ok) return;
+  const range = await res.json();
+  const startEl = document.getElementById('date-start');
+  const endEl   = document.getElementById('date-end');
+  startEl.min = range.min;
+  startEl.max = range.max;
+  endEl.min   = range.min;
+  endEl.max   = range.max;
+  // default end to today's snapshot max
+  endEl.value = range.max;
+
+  function onDateChange() {
+    const s = startEl.value;
+    const e = endEl.value;
+    if (s && e && s <= e) {
+      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+      currentHours = null;
+      currentStart = s;
+      currentEnd   = e;
+      reloadAll();
+    }
+  }
+  startEl.addEventListener('change', onDateChange);
+  endEl.addEventListener('change', onDateChange);
+}
 
 // ─── Nav active link on scroll ────────────────────────────────────────────────
 const sections = document.querySelectorAll('section[id]');
@@ -958,6 +1033,7 @@ async function reloadAll() {
 
 async function init() {
   await Promise.all([
+    initDatePickers(),
     loadActivity(),
     loadClassDist(),
     loadActiveDist(),

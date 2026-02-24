@@ -29,6 +29,12 @@ nav {
 .nav-logo span { color: var(--text); }
 .nav-back { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; padding: 6px 12px; border-radius: 4px; transition: color 0.15s, background 0.15s; }
 .nav-back:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+.nav-controls { display: flex; align-items: center; gap: 6px; margin-left: auto; flex-wrap: wrap; }
+.preset-btn { background: var(--card); border: 1px solid var(--border); color: var(--muted); font-family: 'Share Tech Mono', monospace; font-size: 12px; padding: 5px 9px; border-radius: 4px; cursor: pointer; transition: all 0.15s; }
+.preset-btn:hover, .preset-btn.active { color: var(--accent); border-color: var(--accent); background: rgba(0,212,255,0.08); }
+.date-sep { color: var(--muted); font-size: 13px; padding: 0 2px; }
+.date-input { background: var(--card); border: 1px solid var(--border); color: var(--text); font-family: 'Share Tech Mono', monospace; font-size: 12px; padding: 5px 8px; border-radius: 4px; cursor: pointer; outline: none; transition: border-color 0.15s; color-scheme: dark; }
+.date-input:focus { border-color: var(--accent); }
 main { max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
 
 /* Search */
@@ -73,6 +79,15 @@ main { max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
 <nav>
   <div class="nav-logo">FantasiaStats<span>.win</span></div>
   <a href="/" class="nav-back">← Dashboard</a>
+  <div class="nav-controls" id="nav-controls" style="display:none;">
+    <button class="preset-btn active" data-hours="0">All</button>
+    <button class="preset-btn" data-hours="168">7d</button>
+    <button class="preset-btn" data-hours="720">30d</button>
+    <span class="date-sep">|</span>
+    <input type="date" id="date-start" class="date-input">
+    <span class="date-sep">→</span>
+    <input type="date" id="date-end" class="date-input">
+  </div>
 </nav>
 <main>
   <div class="search-bar">
@@ -117,7 +132,53 @@ function fmtExp(n) {
   return n.toLocaleString();
 }
 
+let currentPlayer = '';
+let currentHours  = null;
+let currentStart  = null;
+let currentEnd    = null;
+
+function buildParams() {
+  const p = new URLSearchParams();
+  if (currentStart && currentEnd) {
+    p.set('start', currentStart);
+    p.set('end', currentEnd);
+  } else if (currentHours) {
+    p.set('hours', currentHours);
+  }
+  return p.toString() ? '?' + p.toString() : '';
+}
+
+async function initDatePickers(firstSeen) {
+  const res = await fetch('/api/snapshot_range');
+  if (!res.ok) return;
+  const range = await res.json();
+  const startEl = document.getElementById('date-start');
+  const endEl   = document.getElementById('date-end');
+  // min is player's first seen date, not global min
+  const playerMin = firstSeen.substring(0, 10).replace(/_/g, '-').replace(' ', '-');
+  startEl.min = range.min;
+  startEl.max = range.max;
+  endEl.min   = range.min;
+  endEl.max   = range.max;
+  endEl.value = range.max;
+
+  function onDateChange() {
+    const s = startEl.value;
+    const e = endEl.value;
+    if (s && e && s <= e) {
+      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+      currentHours = null;
+      currentStart = s;
+      currentEnd   = e;
+      loadPlayer(currentPlayer);
+    }
+  }
+  startEl.addEventListener('change', onDateChange);
+  endEl.addEventListener('change', onDateChange);
+}
+
 async function loadPlayer(name) {
+  currentPlayer = name;
   const container = document.getElementById('scorecard-container');
   container.innerHTML = '<div class="loading">Loading</div>';
 
@@ -125,12 +186,33 @@ async function loadPlayer(name) {
   history.replaceState(null, '', `/player/${encodeURIComponent(name)}`);
   document.title = `${name} — Fantasia Rankings`;
 
-  const res = await fetch(`/api/player/${encodeURIComponent(name)}`);
+  const res = await fetch(`/api/player/${encodeURIComponent(name)}${buildParams()}`);
   const d = await res.json();
 
   if (!res.ok) {
     container.innerHTML = `<div class="card"><div class="empty-state">${d.error}</div></div>`;
     return;
+  }
+
+  // Show nav controls and init date pickers on first load
+  const navControls = document.getElementById('nav-controls');
+  navControls.style.display = 'flex';
+  if (!document.getElementById('date-start').dataset.initialized) {
+    document.getElementById('date-start').dataset.initialized = '1';
+    initDatePickers(d.first_seen);
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const h = parseInt(btn.dataset.hours);
+        currentHours = h || null;
+        currentStart = null;
+        currentEnd   = null;
+        document.getElementById('date-start').value = '';
+        document.getElementById('date-end').value   = '';
+        loadPlayer(currentPlayer);
+      });
+    });
   }
 
   const pts = d.data_points;

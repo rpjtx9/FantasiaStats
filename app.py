@@ -90,6 +90,8 @@ FANTASIA_EXP_TABLE = {
     196:571209611,197:602511898,198:635529549,199:670356568,200:0,
 }
 
+TS_FMT = "%Y-%m-%d_%H-%M-%S"
+
 def get_connection():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -122,31 +124,50 @@ def exp_to_level_percent(exp_gained, current_level):
     level_exp = FANTASIA_EXP_TABLE.get(current_level, 1)
     return round((exp_gained / level_exp) * 100, 1)
 
-def get_snapshot_window(hours=None):
+def snapshot_closest_to(cursor, target_ts):
+    """Return the snapshot row closest to target_ts (a datetime object)."""
+    cursor.execute("SELECT id, timestamp FROM snapshots ORDER BY timestamp")
+    rows = [dict(row) for row in cursor.fetchall()]
+    return min(rows, key=lambda r: abs(
+        (datetime.strptime(r["timestamp"], TS_FMT) - target_ts).total_seconds()
+    ))
+
+def get_snapshot_window(hours=None, start=None, end=None):
+    """
+    Returns (latest_snap, prev_snap) dicts.
+    Priority: date range (start/end) > hours > default (last two snapshots).
+    start/end are ISO date strings: "YYYY-MM-DD"
+    """
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT id, timestamp FROM snapshots ORDER BY id DESC LIMIT 1")
-    latest = dict(cursor.fetchone())
 
-    if hours:
-        fmt = "%Y-%m-%d_%H-%M-%S"
-        latest_ts = datetime.strptime(latest["timestamp"], fmt)
-        target_ts = latest_ts - timedelta(hours=hours)
-        cursor.execute("SELECT id, timestamp FROM snapshots ORDER BY timestamp")
-        rows = [dict(row) for row in cursor.fetchall()]
+    if start and end:
+        # end date: use end of that day (23:59:59)
+        end_dt = datetime.strptime(end, "%Y-%m-%d") + timedelta(hours=23, minutes=59, seconds=59)
+        start_dt = datetime.strptime(start, "%Y-%m-%d")
+        latest = snapshot_closest_to(cursor, end_dt)
+        prev = snapshot_closest_to(cursor, start_dt)
         conn.close()
-        prev = min(rows, key=lambda r: abs(
-            (datetime.strptime(r["timestamp"], fmt) - target_ts).total_seconds()
-        ))
+        # ensure latest is actually after prev
+        if latest["id"] <= prev["id"]:
+            return prev, None
+        return latest, prev
+    elif hours:
+        cursor.execute("SELECT id, timestamp FROM snapshots ORDER BY id DESC LIMIT 1")
+        latest = dict(cursor.fetchone())
+        latest_ts = datetime.strptime(latest["timestamp"], TS_FMT)
+        target_ts = latest_ts - timedelta(hours=hours)
+        prev = snapshot_closest_to(cursor, target_ts)
+        conn.close()
+        return latest, prev
     else:
         cursor.execute("SELECT id, timestamp FROM snapshots ORDER BY id DESC LIMIT 2")
         rows = cursor.fetchall()
         conn.close()
         if len(rows) < 2:
+            latest = dict(rows[0]) if rows else None
             return latest, None
-        prev = dict(rows[1])
-
-    return latest, prev
+        return dict(rows[0]), dict(rows[1])
 
 # ─── Routes ──────────────────────────────────────────────────────────────────
 
@@ -167,6 +188,22 @@ def guild_page():
 @app.route("/player/<n>")
 def player_page(n=""):
     return render_template("player.html")
+
+@app.route("/api/snapshot_range")
+def api_snapshot_range():
+    """Returns the earliest and latest snapshot dates for date picker bounds."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT MIN(timestamp), MAX(timestamp) FROM snapshots")
+    row = cursor.fetchone()
+    conn.close()
+    if not row or not row[0]:
+        return jsonify({"error": "No snapshots"}), 400
+    fmt_out = "%Y-%m-%d"
+    return jsonify({
+        "min": datetime.strptime(row[0], TS_FMT).strftime(fmt_out),
+        "max": datetime.strptime(row[1], TS_FMT).strftime(fmt_out),
+    })
 
 @app.route("/api/snapshots")
 def api_snapshots():
@@ -216,22 +253,22 @@ def api_class_distribution():
 @app.route("/api/activity")
 def api_activity():
     hours = request.args.get("hours", type=int)
-    latest, prev = get_snapshot_window(hours)
+    start = request.args.get("start")
+    end   = request.args.get("end")
+    latest, prev = get_snapshot_window(hours=hours, start=start, end=end)
     if not prev:
         return jsonify({"error": "Need at least two snapshots"}), 400
 
     latest_id, latest_ts = latest["id"], latest["timestamp"]
     prev_id, prev_ts = prev["id"], prev["timestamp"]
 
-    fmt = "%Y-%m-%d_%H-%M-%S"
-    delta = datetime.strptime(latest_ts, fmt) - datetime.strptime(prev_ts, fmt)
+    delta = datetime.strptime(latest_ts, TS_FMT) - datetime.strptime(prev_ts, TS_FMT)
     total_hours, remainder = divmod(int(delta.total_seconds()), 3600)
     minutes = remainder // 60
 
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Fetch ALL active players (no limit) so counts and breakdowns are accurate
     cursor.execute("""
         SELECT pa.name, SUM(pa.exp_gained) as exp_gained, p.job, p.level
         FROM player_activity pa
@@ -251,13 +288,11 @@ def api_activity():
 
     conn.close()
 
-    # Enrich all active players (needed for accurate class/tier counts)
     for p in active:
         p["job_name"] = JOB_NAMES.get(p["job"], "Unknown")
         p["class"] = get_class_for_job(p["job"])
         p["level_pct"] = exp_to_level_percent(p["exp_gained"], p["level"])
 
-    # Compute counts from the full list
     class_counts = {cls: 0 for cls in CLASS_JOB_IDS}
     for p in active:
         class_counts[p["class"]] += 1
@@ -266,12 +301,10 @@ def api_activity():
     for tier, ids in TIER_JOB_IDS.items():
         tier_counts[tier] = sum(1 for p in active if p["job"] in ids)
 
-
     new_class_counts = {cls: 0 for cls in CLASS_JOB_IDS}
     for p in new_players:
         new_class_counts[get_class_for_job(p["job"])] += 1
 
-    # Build top 5 per tier independently so low-job players aren't crowded out
     top_by_tier = {}
     for tier, ids in TIER_JOB_IDS.items():
         top_by_tier[tier] = [p for p in active if p["job"] in ids][:5]
@@ -293,14 +326,9 @@ def api_server_health():
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Total players: every snapshot
-    cursor.execute("""
-        SELECT timestamp, total_players FROM snapshots ORDER BY timestamp
-    """)
+    cursor.execute("SELECT timestamp, total_players FROM snapshots ORDER BY timestamp")
     total_rows = [dict(row) for row in cursor.fetchall()]
 
-    # Active players: distinct active players per calendar day
-    # Exclude today since we may not have the full 24h yet
     today = datetime.now().strftime("%Y-%m-%d")
     cursor.execute("""
         SELECT substr(s.timestamp, 1, 10) as day,
@@ -314,14 +342,13 @@ def api_server_health():
     active_rows = [dict(row) for row in cursor.fetchall()]
     conn.close()
 
-    fmt = "%Y-%m-%d_%H-%M-%S"
     return jsonify({
         "total": [{
-            "label": datetime.strptime(r["timestamp"], fmt).strftime("%m/%d %H:%M"),
+            "label": datetime.strptime(r["timestamp"], TS_FMT).strftime("%m/%d %H:%M"),
             "total_players": r["total_players"],
         } for r in total_rows],
         "active": [{
-            "label": r["day"][5:],  # "MM-DD"
+            "label": r["day"][5:],
             "active_count": r["active_count"],
         } for r in active_rows],
     })
@@ -329,7 +356,9 @@ def api_server_health():
 @app.route("/api/active_distribution")
 def api_active_distribution():
     hours = request.args.get("hours", type=int)
-    latest, prev = get_snapshot_window(hours)
+    start = request.args.get("start")
+    end   = request.args.get("end")
+    latest, prev = get_snapshot_window(hours=hours, start=start, end=end)
     if not prev:
         return jsonify({"error": "Need at least two snapshots"}), 400
 
@@ -388,10 +417,9 @@ def api_retention():
     if len(snapshots) < 2:
         return jsonify({"error": "Not enough data"}), 400
 
-    fmt = "%Y-%m-%d_%H-%M-%S"
-    first_ts = datetime.strptime(snapshots[0]["timestamp"], fmt)
+    first_ts = datetime.strptime(snapshots[0]["timestamp"], TS_FMT)
     for s in snapshots:
-        ts = datetime.strptime(s["timestamp"], fmt)
+        ts = datetime.strptime(s["timestamp"], TS_FMT)
         s["week"] = (ts - first_ts).days // 7
 
     weeks = sorted(set(s["week"] for s in snapshots))
@@ -441,7 +469,10 @@ def api_retention():
 
 @app.route("/api/player/<name>")
 def api_player(name):
+    start = request.args.get("start")
+    end   = request.args.get("end")
     hours = request.args.get("hours", type=int)
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
@@ -455,10 +486,13 @@ def api_player(name):
     if not rows:
         return jsonify({"error": f"Player '{name}' not found"}), 404
 
-    fmt = "%Y-%m-%d_%H-%M-%S"
-    if hours:
+    if start and end:
+        start_dt = datetime.strptime(start, "%Y-%m-%d")
+        end_dt   = datetime.strptime(end, "%Y-%m-%d") + timedelta(hours=23, minutes=59, seconds=59)
+        rows = [r for r in rows if start_dt <= datetime.strptime(r["timestamp"], TS_FMT) <= end_dt]
+    elif hours:
         cutoff = datetime.now() - timedelta(hours=hours)
-        rows = [r for r in rows if datetime.strptime(r["timestamp"], fmt) >= cutoff]
+        rows = [r for r in rows if datetime.strptime(r["timestamp"], TS_FMT) >= cutoff]
 
     if not rows:
         return jsonify({"error": "No data in that time range"}), 404
@@ -470,7 +504,7 @@ def api_player(name):
     for i, r in enumerate(rows):
         data_points.append({
             "timestamp": r["timestamp"],
-            "label": datetime.strptime(r["timestamp"], fmt).strftime("%m/%d %H:%M"),
+            "label": datetime.strptime(r["timestamp"], TS_FMT).strftime("%m/%d %H:%M"),
             "level": r["level"],
             "rank": r["rank"],
             "exp_gained": exp_gains[i],
@@ -492,7 +526,7 @@ def api_player(name):
         "total_exp_gained": total_exp,
         "levels_gained": latest["level"] - rows[0]["level"],
         "first_seen": rows[0]["timestamp"],
-        "days_tracked": (datetime.strptime(latest["timestamp"], fmt) - datetime.strptime(rows[0]["timestamp"], fmt)).days,
+        "days_tracked": (datetime.strptime(latest["timestamp"], TS_FMT) - datetime.strptime(rows[0]["timestamp"], TS_FMT)).days,
         "data_points": data_points,
     })
 
@@ -523,7 +557,9 @@ def api_guilds():
 
 @app.route("/api/guild")
 def api_guild():
-    hours = request.args.get("hours", type=int)
+    hours      = request.args.get("hours", type=int)
+    start      = request.args.get("start")
+    end        = request.args.get("end")
     guild_name = request.args.get("guild", "")
 
     try:
@@ -532,20 +568,18 @@ def api_guild():
         return jsonify({"error": "guilds.py not found"}), 404
 
     if not guild_name or guild_name not in GUILDS:
-        # Default to first guild if none specified
         guild_name = next(iter(GUILDS))
 
     MEMBERS = GUILDS[guild_name]
 
-    latest, prev = get_snapshot_window(hours)
+    latest, prev = get_snapshot_window(hours=hours, start=start, end=end)
     if not prev:
         return jsonify({"error": "Need at least two snapshots"}), 400
 
     latest_id, latest_ts = latest["id"], latest["timestamp"]
     prev_id, prev_ts = prev["id"], prev["timestamp"]
 
-    fmt = "%Y-%m-%d_%H-%M-%S"
-    delta = datetime.strptime(latest_ts, fmt) - datetime.strptime(prev_ts, fmt)
+    delta = datetime.strptime(latest_ts, TS_FMT) - datetime.strptime(prev_ts, TS_FMT)
     total_hours, remainder = divmod(int(delta.total_seconds()), 3600)
     minutes = remainder // 60
 
@@ -592,10 +626,10 @@ def api_guild():
     return jsonify({
         "guild_name": guild_name,
         "window_label": f"{total_hours}h {minutes}m",
-        "top_exp": sorted(members, key=lambda x: x["exp_gained"], reverse=True)[:10],
+        "top_exp":    sorted(members, key=lambda x: x["exp_gained"], reverse=True)[:10],
         "top_levels": sorted([m for m in members if m["level_delta"] > 0], key=lambda x: x["level_delta"], reverse=True)[:10],
         "top_quests": sorted([m for m in members if m["quest_delta"] > 0], key=lambda x: x["quest_delta"], reverse=True)[:10],
-        "top_cards": sorted([m for m in members if m["card_delta"] > 0], key=lambda x: x["card_delta"], reverse=True)[:10],
+        "top_cards":  sorted([m for m in members if m["card_delta"] > 0], key=lambda x: x["card_delta"], reverse=True)[:10],
     })
 
 if __name__ == "__main__":
