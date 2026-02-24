@@ -628,6 +628,76 @@ def api_players_search():
     conn.close()
     return jsonify(rows)
 
+@app.route("/api/jobs/level_distribution")
+def api_jobs_level_distribution():
+    filter_class = request.args.get("class")
+
+    JOB_LEVEL_FLOORS = {
+        100: 10, 300: 10, 400: 10, 500: 10, 200: 8,
+        110: 30, 120: 30, 130: 30, 210: 30, 220: 30, 230: 30,
+        310: 30, 320: 30, 410: 30, 420: 30, 510: 30, 520: 30,
+        111: 70, 121: 70, 131: 70, 211: 70, 221: 70, 231: 70,
+        311: 70, 321: 70, 411: 70, 421: 70, 511: 70, 521: 70,
+        112: 120, 122: 120, 132: 120, 212: 120, 222: 120, 232: 120,
+        312: 120, 322: 120, 412: 120, 422: 120, 512: 120, 522: 120,
+    }
+
+    CLASS_BRANCHES = {
+        "Beginner": [[0]],
+        "Warrior":  [[110,111,112],[120,121,122],[130,131,132]],
+        "Magician": [[210,211,212],[220,221,222],[230,231,232]],
+        "Archer":   [[310,311,312],[320,321,322]],
+        "Thief":    [[410,411,412],[420,421,422]],
+        "Pirate":   [[510,511,512],[520,521,522]],
+    }
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT MAX(id) FROM snapshots")
+    snapshot_id = cursor.fetchone()[0]
+    cursor.execute("SELECT job, level FROM players WHERE snapshot_id = ?", (snapshot_id,))
+    players = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+
+    classes_to_include = [filter_class] if filter_class and filter_class in CLASS_BRANCHES else list(CLASS_BRANCHES.keys())
+
+    result = []
+    for cls in classes_to_include:
+        if cls == "Beginner":
+            continue
+        for branch_ids in CLASS_BRANCHES[cls]:
+            branch_jobs = []
+            all_labels = set()
+            for job_id in branch_ids:
+                floor = JOB_LEVEL_FLOORS.get(job_id, 1)
+                job_players = [p for p in players if p["job"] == job_id]
+                buckets = {}
+                for p in job_players:
+                    if p["level"] < floor:
+                        continue
+                    if p["level"] == floor:
+                        label = str(floor)
+                    else:
+                        bucket = ((p["level"] - floor - 1) // 10) * 10 + floor + 1
+                        label = f"{bucket}-{bucket+9}"
+                    buckets[label] = buckets.get(label, 0) + 1
+                branch_jobs.append({
+                    "job_id": job_id,
+                    "job_name": JOB_NAMES.get(job_id, "Unknown"),
+                    "buckets": buckets,
+                })
+                all_labels.update(buckets.keys())
+
+            sorted_labels = sorted(all_labels, key=lambda x: int(x.split("-")[0]))
+            result.append({
+                "class": cls,
+                "branch_name": " / ".join(JOB_NAMES.get(j, "?") for j in branch_ids),
+                "jobs": branch_jobs,
+                "labels": sorted_labels,
+            })
+
+    return jsonify(result)
+
 @app.route("/api/guilds")
 def api_guilds():
     try:

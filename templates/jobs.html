@@ -80,6 +80,12 @@ main { max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
 .job-pct { font-family: 'Share Tech Mono', monospace; font-size: 12px; color: var(--muted); margin-left: 6px; }
 
 .loading { color: var(--muted); font-family: 'Share Tech Mono', monospace; font-size: 14px; padding: 40px; text-align: center; }
+
+/* Level dist branch charts */
+.branch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px; margin-top: 4px; }
+.branch-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 16px; }
+.branch-title { font-family: 'Rajdhani', sans-serif; font-size: 14px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
+.branch-chart-wrap { position: relative; height: 200px; }
 </style>
 </head>
 <body>
@@ -102,18 +108,23 @@ main { max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
 
   <div class="two-col">
     <div class="card">
-      <div class="card-title">Current Job Population</div>
+      <div class="card-title">Current Job Population by Branch</div>
       <div class="chart-wrap"><canvas id="chart-job-pop"></canvas></div>
     </div>
     <div class="card">
-      <div class="card-title">Population Trends Over Time</div>
+      <div class="card-title">Branch Population Trends Over Time</div>
       <div class="chart-wrap"><canvas id="chart-job-trends"></canvas></div>
     </div>
   </div>
 
   <div id="breakdown-container" class="card">
-    <div class="card-title">Job Breakdown by Class</div>
+    <div class="card-title">Job Breakdown by Branch</div>
     <div id="breakdown-content"><div class="loading">Loading...</div></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">Level Distribution by Branch</div>
+    <div id="level-dist-content"><div class="loading">Loading...</div></div>
   </div>
 </main>
 
@@ -304,14 +315,94 @@ function renderBreakdown(jobData, filterClass) {
   }).join('');
 }
 
-// ─── Init ─────────────────────────────────────────────────────────────────────
+// ─── Level Distribution by Branch ────────────────────────────────────────────
+async function renderLevelDist(filterClass) {
+  const container = document.getElementById('level-dist-content');
+  container.innerHTML = '<div class="loading">Loading...</div>';
+
+  const param = filterClass !== 'All' ? `?class=${encodeURIComponent(filterClass)}` : '';
+  const res = await fetch(`/api/jobs/level_distribution${param}`);
+  if (!res.ok) { container.innerHTML = '<div class="loading">Failed to load</div>'; return; }
+  const branches = await res.json();
+
+  if (!branches.length) { container.innerHTML = '<div class="loading">No data</div>'; return; }
+
+  // Group by class for headers when showing All
+  const grouped = {};
+  for (const b of branches) {
+    if (!grouped[b.class]) grouped[b.class] = [];
+    grouped[b.class].push(b);
+  }
+
+  // Destroy old branch charts
+  Object.keys(charts).filter(k => k.startsWith('branch-')).forEach(k => {
+    charts[k].destroy(); delete charts[k];
+  });
+
+  let html = '';
+  for (const [cls, clsBranches] of Object.entries(grouped)) {
+    if (filterClass === 'All') {
+      const color = CLASS_COLORS[cls] || '#aaa';
+      html += `<div style="margin-bottom:8px;margin-top:16px;font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;color:${color};letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--border);padding-bottom:6px">${cls}</div>`;
+    }
+    html += '<div class="branch-grid">';
+    for (const branch of clsBranches) {
+      const id = `branch-${branch.class}-${branch.jobs[0].job_id}`;
+      html += `<div class="branch-card"><div class="branch-title">${branch.branch_name}</div><div class="branch-chart-wrap"><canvas id="${id}"></canvas></div></div>`;
+    }
+    html += '</div>';
+  }
+  container.innerHTML = html;
+
+  // Render each branch chart
+  for (const branch of branches) {
+    const id = `branch-${branch.class}-${branch.jobs[0].job_id}`;
+    const ctx = document.getElementById(id);
+    if (!ctx) continue;
+
+    charts[id] = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: branch.labels,
+        datasets: branch.jobs.map(j => ({
+          label: j.job_name,
+          data: branch.labels.map(lbl => j.buckets[lbl] || 0),
+          backgroundColor: (JOB_COLORS[j.job_id] || '#aaa') + '99',
+          borderColor: JOB_COLORS[j.job_id] || '#aaa',
+          borderWidth: 1,
+          borderRadius: 2,
+        })),
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: {
+            display: branch.jobs.length > 1,
+            position: 'bottom',
+            labels: { color: '#64748b', font: { family: 'Barlow', size: 11 }, boxWidth: 8, padding: 8 },
+          },
+          datalabels: { display: false },
+          tooltip: { mode: 'index', intersect: false },
+        },
+        scales: {
+          x: { ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 10 }, maxRotation: 45 }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' } },
+          y: { ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' } },
+        },
+      },
+    });
+  }
+}
 async function loadAll() {
   const res = await fetch('/api/jobs');
   if (!res.ok) return;
   allJobData = await res.json();
   renderPopChart(allJobData, currentClass);
   renderBreakdown(allJobData, currentClass);
-  await renderTrendsChart(currentClass);
+  await Promise.all([
+    renderTrendsChart(currentClass),
+    renderLevelDist(currentClass),
+  ]);
 }
 
 // ─── Filter buttons ───────────────────────────────────────────────────────────
@@ -322,7 +413,10 @@ document.querySelectorAll('.filter-btn').forEach(btn => {
     currentClass = btn.dataset.class;
     renderPopChart(allJobData, currentClass);
     renderBreakdown(allJobData, currentClass);
-    await renderTrendsChart(currentClass);
+    await Promise.all([
+      renderTrendsChart(currentClass),
+      renderLevelDist(currentClass),
+    ]);
   });
 });
 
