@@ -664,6 +664,20 @@ def api_jobs_level_distribution():
     result = []
     for cls in classes_to_include:
         if cls == "Beginner":
+            # Beginner is a single job with no branches, handle separately
+            beg_players = [p for p in players if p["job"] == 0]
+            buckets = {}
+            for p in beg_players:
+                bucket = ((p["level"] - 1) // 10) * 10 + 1
+                label = f"{bucket}-{bucket+9}"
+                buckets[label] = buckets.get(label, 0) + 1
+            sorted_labels = sorted(buckets.keys(), key=lambda x: int(x.split("-")[0]))
+            result.append({
+                "class": "Beginner",
+                "branch_name": "Beginner",
+                "jobs": [{"job_id": 0, "job_name": "Beginner", "buckets": buckets}],
+                "labels": sorted_labels,
+            })
             continue
         for branch_ids in CLASS_BRANCHES[cls]:
             branch_jobs = []
