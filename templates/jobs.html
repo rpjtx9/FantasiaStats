@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Job Populations — FantasiaStats.WIN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<style>
+:root {
+  --bg: #0b0e1a; --surface: #111827; --card: #141d2e; --border: #1e2d47;
+  --accent: #00d4ff; --accent2: #7c3aed; --green: #10b981; --yellow: #f59e0b;
+  --red: #ef4444; --text: #e2e8f0; --muted: #64748b;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'Barlow', sans-serif; min-height: 100vh; }
+body::before {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+}
+nav {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(11,14,26,0.92); backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 0 32px; display: flex; align-items: center; height: 56px; gap: 24px;
+}
+.nav-logo { font-family: 'Rajdhani',sans-serif; font-size: 20px; font-weight: 700; letter-spacing: 0.1em; color: var(--accent); text-transform: uppercase; }
+.nav-logo span { color: var(--text); }
+.nav-back { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; padding: 6px 12px; border-radius: 4px; transition: color 0.15s, background 0.15s; }
+.nav-back:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+
+main { max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
+
+/* Class filter bar */
+.filter-bar {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 28px; flex-wrap: wrap;
+}
+.filter-btn {
+  background: var(--card); border: 1px solid var(--border); color: var(--muted);
+  font-family: 'Share Tech Mono', monospace; font-size: 13px; padding: 6px 14px;
+  border-radius: 4px; cursor: pointer; transition: all 0.15s;
+}
+.filter-btn:hover { color: var(--text); border-color: var(--muted); }
+.filter-btn.active { color: var(--accent); border-color: var(--accent); background: rgba(0,212,255,0.08); }
+.filter-btn[data-class="Warrior"].active    { color: #ff4444; border-color: #ff4444; background: rgba(255,68,68,0.08); }
+.filter-btn[data-class="Magician"].active   { color: #bb44ff; border-color: #bb44ff; background: rgba(187,68,255,0.08); }
+.filter-btn[data-class="Archer"].active     { color: #33ff77; border-color: #33ff77; background: rgba(51,255,119,0.08); }
+.filter-btn[data-class="Thief"].active      { color: #4477ff; border-color: #4477ff; background: rgba(68,119,255,0.08); }
+.filter-btn[data-class="Pirate"].active     { color: #ffaa00; border-color: #ffaa00; background: rgba(255,170,0,0.08); }
+.filter-btn[data-class="Beginner"].active   { color: #95a5a6; border-color: #95a5a6; background: rgba(149,165,166,0.08); }
+
+/* Cards */
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 24px; }
+.card-title { font-family: 'Rajdhani', sans-serif; font-size: 16px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; }
+
+/* Two column layout */
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
+@media (max-width: 900px) { .two-col { grid-template-columns: 1fr; } }
+
+/* Chart containers */
+.chart-wrap { position: relative; height: 360px; }
+.chart-wrap-tall { position: relative; height: 480px; }
+
+/* Job breakdown table */
+.class-section { margin-bottom: 32px; }
+.class-header {
+  font-family: 'Rajdhani', sans-serif; font-size: 20px; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 12px;
+  padding-bottom: 8px; border-bottom: 1px solid var(--border);
+}
+.job-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.job-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+  padding: 12px 16px; display: flex; justify-content: space-between; align-items: center;
+}
+.job-name { font-size: 14px; color: var(--text); }
+.job-count { font-family: 'Share Tech Mono', monospace; font-size: 15px; }
+.job-pct { font-family: 'Share Tech Mono', monospace; font-size: 12px; color: var(--muted); margin-left: 6px; }
+
+.loading { color: var(--muted); font-family: 'Share Tech Mono', monospace; font-size: 14px; padding: 40px; text-align: center; }
+</style>
+</head>
+<body>
+<nav>
+  <div class="nav-logo">FantasiaStats<span>.win</span></div>
+  <a href="/" class="nav-back">← Dashboard</a>
+</nav>
+
+<main>
+  <div class="filter-bar">
+    <span style="font-size:13px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-right:4px;">Class:</span>
+    <button class="filter-btn active" data-class="All">All</button>
+    <button class="filter-btn" data-class="Warrior">Warrior</button>
+    <button class="filter-btn" data-class="Magician">Magician</button>
+    <button class="filter-btn" data-class="Archer">Archer</button>
+    <button class="filter-btn" data-class="Thief">Thief</button>
+    <button class="filter-btn" data-class="Pirate">Pirate</button>
+    <button class="filter-btn" data-class="Beginner">Beginner</button>
+  </div>
+
+  <div class="two-col">
+    <div class="card">
+      <div class="card-title">Current Job Population</div>
+      <div class="chart-wrap"><canvas id="chart-job-pop"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">Population Trends Over Time</div>
+      <div class="chart-wrap"><canvas id="chart-job-trends"></canvas></div>
+    </div>
+  </div>
+
+  <div id="breakdown-container" class="card">
+    <div class="card-title">Job Breakdown by Class</div>
+    <div id="breakdown-content"><div class="loading">Loading...</div></div>
+  </div>
+</main>
+
+<script>
+Chart.register(ChartDataLabels);
+
+const CLASS_COLORS = {
+  Beginner: '#95a5a6', Warrior: '#ff4444', Magician: '#bb44ff',
+  Archer: '#33ff77', Thief: '#4477ff', Pirate: '#ffaa00',
+};
+
+const chartDefaults = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { display: false },
+    datalabels: { display: false },
+  },
+  scales: {
+    x: { ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 12 } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' } },
+    y: { ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 12 } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' } },
+  },
+};
+
+let charts = {};
+let currentClass = 'All';
+let allJobData = null;
+
+function destroyChart(id) {
+  if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+}
+
+// ─── Job Population Bar Chart ─────────────────────────────────────────────────
+function renderPopChart(jobData, filterClass) {
+  destroyChart('chart-job-pop');
+
+  let entries = [];
+  if (filterClass === 'All') {
+    for (const [cls, jobs] of Object.entries(jobData)) {
+      for (const j of jobs) {
+        if (j.count > 0) entries.push({ label: j.job_name, count: j.count, class: cls });
+      }
+    }
+  } else {
+    entries = (jobData[filterClass] || [])
+      .filter(j => j.count > 0)
+      .map(j => ({ label: j.job_name, count: j.count, class: filterClass }));
+  }
+
+  entries.sort((a, b) => b.count - a.count);
+
+  const labels  = entries.map(e => e.label);
+  const counts  = entries.map(e => e.count);
+  const colors  = entries.map(e => CLASS_COLORS[e.class] || '#aaa');
+  const ctx = document.getElementById('chart-job-pop');
+  if (!ctx) return;
+
+  charts['chart-job-pop'] = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: counts,
+        backgroundColor: colors.map(c => c + '99'),
+        borderColor: colors,
+        borderWidth: 1,
+        borderRadius: 3,
+      }]
+    },
+    options: {
+      ...chartDefaults,
+      indexAxis: 'y',
+      plugins: {
+        ...chartDefaults.plugins,
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => ` ${ctx.raw.toLocaleString()} players` } },
+        datalabels: {
+          anchor: 'end', align: 'right',
+          color: '#e2e8f0', font: { family: 'Share Tech Mono', size: 11 },
+          formatter: val => val > 0 ? val.toLocaleString() : '',
+        },
+      },
+      scales: {
+        ...chartDefaults.scales,
+        x: { ...chartDefaults.scales.x, grace: '10%' },
+        y: { ...chartDefaults.scales.y, ticks: { color: '#e2e8f0', font: { family: 'Barlow', size: 13, weight: '500' } } },
+      },
+    },
+  });
+}
+
+// ─── Trends Line Chart ────────────────────────────────────────────────────────
+async function renderTrendsChart(filterClass) {
+  destroyChart('chart-job-trends');
+  const param = filterClass !== 'All' ? `?class=${encodeURIComponent(filterClass)}` : '';
+  const res = await fetch(`/api/jobs/trends${param}`);
+  if (!res.ok) return;
+  const data = await res.json();
+
+  // Only show jobs that have any non-zero data
+  const activeSeries = data.series.filter(s => s.data.some(v => v > 0));
+
+  const ctx = document.getElementById('chart-job-trends');
+  if (!ctx) return;
+
+  charts['chart-job-trends'] = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: data.labels,
+      datasets: activeSeries.map(s => {
+        const color = CLASS_COLORS[s.class] || '#aaa';
+        return {
+          label: s.job_name,
+          data: s.data,
+          borderColor: color,
+          backgroundColor: color + '22',
+          borderWidth: 2,
+          pointRadius: data.labels.length > 30 ? 0 : 3,
+          tension: 0.3,
+        };
+      }),
+    },
+    options: {
+      ...chartDefaults,
+      plugins: {
+        ...chartDefaults.plugins,
+        legend: {
+          display: true,
+          position: 'bottom',
+          labels: { color: '#64748b', font: { family: 'Barlow', size: 12 }, boxWidth: 10, padding: 10 },
+        },
+        tooltip: { mode: 'index', intersect: false },
+        datalabels: { display: false },
+      },
+    },
+  });
+}
+
+// ─── Breakdown Table ──────────────────────────────────────────────────────────
+function renderBreakdown(jobData, filterClass) {
+  const container = document.getElementById('breakdown-content');
+  const totalAll = Object.values(jobData).flat().reduce((s, j) => s + j.count, 0);
+
+  const classesToShow = filterClass === 'All'
+    ? Object.keys(jobData)
+    : [filterClass];
+
+  container.innerHTML = classesToShow.map(cls => {
+    const jobs = jobData[cls].filter(j => j.count > 0).sort((a, b) => b.count - a.count);
+    if (!jobs.length) return '';
+    const color = CLASS_COLORS[cls] || '#aaa';
+    const clsTotal = jobs.reduce((s, j) => s + j.count, 0);
+    return `
+      <div class="class-section">
+        <div class="class-header" style="color:${color}">
+          ${cls} <span style="color:var(--muted);font-size:14px;font-weight:400">${clsTotal.toLocaleString()} players (${((clsTotal/totalAll)*100).toFixed(1)}%)</span>
+        </div>
+        <div class="job-grid">
+          ${jobs.map(j => `
+            <div class="job-card">
+              <span class="job-name">${j.job_name}</span>
+              <span>
+                <span class="job-count" style="color:${color}">${j.count.toLocaleString()}</span>
+                <span class="job-pct">${((j.count/totalAll)*100).toFixed(1)}%</span>
+              </span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+async function loadAll() {
+  const res = await fetch('/api/jobs');
+  if (!res.ok) return;
+  allJobData = await res.json();
+  renderPopChart(allJobData, currentClass);
+  renderBreakdown(allJobData, currentClass);
+  await renderTrendsChart(currentClass);
+}
+
+// ─── Filter buttons ───────────────────────────────────────────────────────────
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentClass = btn.dataset.class;
+    renderPopChart(allJobData, currentClass);
+    renderBreakdown(allJobData, currentClass);
+    await renderTrendsChart(currentClass);
+  });
+});
+
+// ─── Read class from URL param ────────────────────────────────────────────────
+const urlClass = new URLSearchParams(window.location.search).get('class');
+if (urlClass) {
+  currentClass = urlClass;
+  const btn = document.querySelector(`.filter-btn[data-class="${urlClass}"]`);
+  if (btn) {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+}
+
+loadAll();
+</script>
+</body>
+</html>

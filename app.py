@@ -530,7 +530,88 @@ def api_player(name):
         "data_points": data_points,
     })
 
-@app.route("/api/players/search")
+@app.route("/jobs")
+def jobs_page():
+    return render_template("jobs.html")
+
+@app.route("/api/jobs")
+def api_jobs():
+    """Current job populations from latest snapshot, grouped by class."""
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT MAX(id) FROM snapshots")
+    snapshot_id = cursor.fetchone()[0]
+    cursor.execute("SELECT job FROM players WHERE snapshot_id = ?", (snapshot_id,))
+    jobs = [row[0] for row in cursor.fetchall()]
+    conn.close()
+
+    # Build per-job counts
+    job_counts = {}
+    for job in jobs:
+        job_counts[job] = job_counts.get(job, 0) + 1
+
+    # Group by class
+    result = {}
+    for cls, job_ids in CLASS_JOB_IDS.items():
+        result[cls] = []
+        for job_id in job_ids:
+            count = job_counts.get(job_id, 0)
+            result[cls].append({
+                "job_id": job_id,
+                "job_name": JOB_NAMES.get(job_id, "Unknown"),
+                "count": count,
+            })
+
+    return jsonify(result)
+
+@app.route("/api/jobs/trends")
+def api_jobs_trends():
+    """Job population trends over all snapshots, grouped by class."""
+    filter_class = request.args.get("class")
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, timestamp FROM snapshots ORDER BY timestamp")
+    snapshots = [dict(row) for row in cursor.fetchall()]
+
+    if not snapshots:
+        conn.close()
+        return jsonify({"error": "No snapshots"}), 400
+
+    # Determine which job_ids to include
+    if filter_class and filter_class in CLASS_JOB_IDS:
+        job_ids_to_include = CLASS_JOB_IDS[filter_class]
+    else:
+        job_ids_to_include = [jid for ids in CLASS_JOB_IDS.values() for jid in ids]
+
+    labels = []
+    series = {jid: [] for jid in job_ids_to_include}
+
+    for s in snapshots:
+        labels.append(datetime.strptime(s["timestamp"], TS_FMT).strftime("%m/%d"))
+        cursor.execute(
+            "SELECT job, COUNT(*) as cnt FROM players WHERE snapshot_id = ? GROUP BY job",
+            (s["id"],)
+        )
+        counts = {row[0]: row[1] for row in cursor.fetchall()}
+        for jid in job_ids_to_include:
+            series[jid].append(counts.get(jid, 0))
+
+    conn.close()
+
+    return jsonify({
+        "labels": labels,
+        "series": [
+            {
+                "job_id": jid,
+                "job_name": JOB_NAMES.get(jid, "Unknown"),
+                "class": get_class_for_job(jid),
+                "data": series[jid],
+            }
+            for jid in job_ids_to_include
+        ],
+    })
+
+
 def api_players_search():
     q = request.args.get("q", "").strip()
     if len(q) < 2:

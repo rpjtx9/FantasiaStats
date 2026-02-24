@@ -690,9 +690,16 @@ async function loadClassDist() {
     }],
   }, {
     indexAxis: 'y',
+    onHover: (evt) => { evt.native.target.style.cursor = 'pointer'; },
+    onClick: (evt, elements) => {
+      if (elements.length > 0) {
+        const label = labels[elements[0].index];
+        window.location.href = `/jobs?class=${encodeURIComponent(label)}`;
+      }
+    },
     plugins: {
       legend: { display: false },
-      tooltip: { callbacks: { label: ctx => ` ${ctx.raw} players` } },
+      tooltip: { callbacks: { label: ctx => ` ${ctx.raw} players — click to explore` } },
       datalabels: {
         anchor: 'end',
         align: 'right',
