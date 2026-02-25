@@ -220,7 +220,7 @@ function renderPopChart(jobData, filterClass) {
 
   // Determine which classes to include in fixed job-ID order
   const classesToOrder = filterClass === 'All'
-    ? CLASS_ORDER.filter(c => c !== 'Beginner')
+    ? CLASS_ORDER
     : [filterClass];
 
   // Build branch rows: fixed class order or descending by total
