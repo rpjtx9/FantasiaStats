@@ -556,7 +556,7 @@ def api_jobs():
     cursor = conn.cursor()
     cursor.execute("SELECT MAX(id) FROM snapshots")
     snapshot_id = cursor.fetchone()[0]
-    cursor.execute("SELECT job, level FROM players WHERE snapshot_id = ?", (snapshot_id,))
+    cursor.execute("SELECT job, level FROM players WHERE snapshot_id = ? AND (job != 0 OR level >= 11)", (snapshot_id,))
     rows = [dict(row) for row in cursor.fetchall()]
     conn.close()
 
@@ -610,7 +610,7 @@ def api_jobs_trends():
     for s in snapshots:
         labels.append(datetime.strptime(s["timestamp"], TS_FMT).strftime("%m/%d"))
         cursor.execute(
-            "SELECT job, COUNT(*) as cnt FROM players WHERE snapshot_id = ? GROUP BY job",
+            "SELECT job, COUNT(*) as cnt FROM players WHERE snapshot_id = ? AND (job != 0 OR level >= 11) GROUP BY job",
             (s["id"],)
         )
         counts = {row[0]: row[1] for row in cursor.fetchall()}

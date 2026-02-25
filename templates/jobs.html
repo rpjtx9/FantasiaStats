@@ -179,56 +179,116 @@ function destroyChart(id) {
 function renderPopChart(jobData, filterClass) {
   destroyChart('chart-job-pop');
 
-  let entries = [];
-  if (filterClass === 'All') {
-    for (const [cls, jobs] of Object.entries(jobData)) {
-      for (const j of jobs) {
-        if (j.count > 0 && (j.job_id === 0 || j.job_id % 100 !== 0)) entries.push({ label: j.job_name, count: j.count, class: cls, job_id: j.job_id });
-      }
-    }
-  } else {
-    entries = (jobData[filterClass] || [])
-      .filter(j => j.count > 0 && (j.job_id === 0 || j.job_id % 100 !== 0))
-      .map(j => ({ label: j.job_name, count: j.count, class: filterClass, job_id: j.job_id }));
+  // Branch definitions matching the backend
+  const CLASS_BRANCHES_POP = {
+    Warrior:  { Fighter: [110,111,112], Knight: [120,121,122], Spearman: [130,131,132] },
+    Magician: { 'Fire/Poison': [210,211,212], 'Ice/Lightning': [220,221,222], Cleric: [230,231,232] },
+    Archer:   { Hunter: [310,311,312], Crossbow: [320,321,322] },
+    Thief:    { Assassin: [410,411,412], Bandit: [420,421,422] },
+    Pirate:   { Brawler: [510,511,512], Gunslinger: [520,521,522] },
+    Beginner: { Beginner: [0] },
+  };
+
+  // Build a flat lookup of job_id -> job info from jobData
+  const jobLookup = {};
+  for (const [cls, jobs] of Object.entries(jobData)) {
+    for (const j of jobs) jobLookup[j.job_id] = j;
   }
 
-  entries.sort((a, b) => b.count - a.count);
+  // Determine which classes to include
+  const classesToShow = filterClass === 'All'
+    ? Object.keys(CLASS_BRANCHES_POP).filter(c => c !== 'Beginner')
+    : [filterClass];
 
-  const labels  = entries.map(e => e.label);
-  const counts  = entries.map(e => e.count);
-  const colors  = entries.map(e => JOB_COLORS[e.job_id] || CLASS_COLORS[e.class] || '#aaa');
+  // Build branch rows: one row per branch, sorted by total descending
+  const branchRows = [];
+  for (const cls of classesToShow) {
+    const branches = CLASS_BRANCHES_POP[cls] || {};
+    for (const [branchName, jobIds] of Object.entries(branches)) {
+      const total = jobIds.reduce((s, id) => s + (jobLookup[id]?.count || 0), 0);
+      if (total === 0) continue;
+      branchRows.push({ branchName, jobIds, cls, total });
+    }
+  }
+  branchRows.sort((a, b) => b.total - a.total);
+
+  const branchLabels = branchRows.map(b => b.branchName);
+
+  // Collect all unique job_ids across shown branches (excluding base jobs)
+  const allJobIds = [...new Set(branchRows.flatMap(b => b.jobIds))];
+
+  // One dataset per job (each job is a segment)
+  const datasets = allJobIds.map(job_id => {
+    const j = jobLookup[job_id];
+    const color = JOB_COLORS[job_id] || '#aaa';
+    return {
+      label: j?.job_name || String(job_id),
+      data: branchRows.map(b => b.jobIds.includes(job_id) ? (j?.count || 0) : 0),
+      backgroundColor: color + 'bb',
+      hoverBackgroundColor: color + 'ee',
+      borderColor: color,
+      borderWidth: 1,
+    };
+  });
+
+  // Total label plugin
+  const stackTotalPlugin = {
+    id: 'branchTotals',
+    afterDatasetsDraw(chart) {
+      const { ctx, scales: { x, y } } = chart;
+      branchRows.forEach((b, i) => {
+        const yPos = y.getPixelForValue(i);
+        const xPos = x.getPixelForValue(b.total);
+        ctx.save();
+        ctx.font = '11px "Share Tech Mono"';
+        ctx.fillStyle = '#e2e8f0';
+        ctx.textAlign = 'left';
+        ctx.fillText(b.total.toLocaleString(), xPos + 6, yPos + 4);
+        ctx.restore();
+      });
+    },
+  };
+
   const ctx = document.getElementById('chart-job-pop');
   if (!ctx) return;
 
   charts['chart-job-pop'] = new Chart(ctx, {
     type: 'bar',
-    data: {
-      labels,
-      datasets: [{
-        data: counts,
-        backgroundColor: colors.map(c => c + '99'),
-        borderColor: colors,
-        borderWidth: 1,
-        borderRadius: 3,
-      }]
-    },
+    plugins: [stackTotalPlugin, ChartDataLabels],
+    data: { labels: branchLabels, datasets },
     options: {
-      ...chartDefaults,
       indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
       plugins: {
-        ...chartDefaults.plugins,
         legend: { display: false },
-        tooltip: { callbacks: { label: ctx => ` ${ctx.raw.toLocaleString()} players` } },
+        tooltip: {
+          mode: 'index',
+          intersect: true,
+          callbacks: {
+            title: items => items.length ? items[0].label : '',
+            label: ctx => ctx.raw > 0 ? ` ${ctx.dataset.label}: ${ctx.raw.toLocaleString()}` : null,
+          },
+        },
         datalabels: {
-          anchor: 'end', align: 'right',
-          color: '#e2e8f0', font: { family: 'Share Tech Mono', size: 11 },
-          formatter: val => val > 0 ? val.toLocaleString() : '',
+          display: ctx => ctx.dataset.data[ctx.dataIndex] > 0,
+          anchor: 'center', align: 'center',
+          color: '#0b0e1a',
+          font: { family: 'Share Tech Mono', size: 10, weight: 'bold' },
+          formatter: val => val > 20 ? val.toLocaleString() : '',
         },
       },
       scales: {
-        ...chartDefaults.scales,
-        x: { ...chartDefaults.scales.x, grace: '10%' },
-        y: { ...chartDefaults.scales.y, ticks: { color: '#e2e8f0', font: { family: 'Barlow', size: 13, weight: '500' } } },
+        x: {
+          stacked: true, grace: '15%',
+          ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 12 } },
+          grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' },
+        },
+        y: {
+          stacked: true,
+          ticks: { color: '#e2e8f0', font: { family: 'Barlow', size: 13, weight: '500' } },
+          grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' },
+        },
       },
     },
   });
