@@ -3,7 +3,7 @@ import json
 import time
 import os
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 URL = "https://fantasia.ms/rankings"
@@ -120,7 +120,7 @@ def save_snapshot(players):
     data_dir = Path(os.environ.get("DATA_DIR", "data")) / "snapshots"
     data_dir.mkdir(parents=True, exist_ok=True)
 
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d_%H-%M-%S")
     filename = data_dir / f"rankings_{timestamp}.json"
 
     with open(filename, "w") as f:

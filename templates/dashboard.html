@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FantasiaStats.MS</title>
+<title>Dashboard — FantasiaStats.WIN</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
@@ -625,7 +625,7 @@ function fmtTs(ts) {
   const [date, time] = ts.split('_');
   const [y,mo,d] = date.split('-');
   const [h,mi] = time.split('-');
-  return `${mo}/${d} ${h}:${mi} CST`;
+  return `${mo}/${d} ${h}:${mi} UTC`;
 }
 
 const chartDefaults = {
