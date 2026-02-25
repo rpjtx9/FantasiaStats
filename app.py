@@ -235,20 +235,35 @@ def api_level_distribution():
 
 @app.route("/api/class_distribution")
 def api_class_distribution():
+    CLASS_BRANCHES_DIST = {
+        "Warrior":  {"Fighter": [110,111,112], "Knight": [120,121,122], "Spearman": [130,131,132]},
+        "Magician": {"Fire/Poison": [210,211,212], "Ice/Lightning": [220,221,222], "Cleric": [230,231,232]},
+        "Archer":   {"Hunter": [310,311,312], "Crossbow": [320,321,322]},
+        "Thief":    {"Assassin": [410,411,412], "Bandit": [420,421,422]},
+        "Pirate":   {"Brawler": [510,511,512], "Gunslinger": [520,521,522]},
+        "Beginner": {"Beginner": [0]},
+    }
+
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("SELECT MAX(id) FROM snapshots")
     snapshot_id = cursor.fetchone()[0]
-    cursor.execute("SELECT job FROM players WHERE snapshot_id = ?", (snapshot_id,))
-    jobs = [row[0] for row in cursor.fetchall()]
+    cursor.execute("""
+        SELECT job, COUNT(*) as cnt FROM players
+        WHERE snapshot_id = ?
+        AND (job != 0 OR level >= 11)
+        GROUP BY job
+    """, (snapshot_id,))
+    job_counts = {row[0]: row[1] for row in cursor.fetchall()}
     conn.close()
 
-    class_counts = {cls: 0 for cls in CLASS_JOB_IDS}
-    for job in jobs:
-        cls = get_class_for_job(job)
-        class_counts[cls] += 1
+    result = {}
+    for cls, branches in CLASS_BRANCHES_DIST.items():
+        result[cls] = {}
+        for branch_name, job_ids in branches.items():
+            result[cls][branch_name] = sum(job_counts.get(j, 0) for j in job_ids)
 
-    return jsonify(class_counts)
+    return jsonify(result)
 
 @app.route("/api/activity")
 def api_activity():
@@ -541,14 +556,13 @@ def api_jobs():
     cursor = conn.cursor()
     cursor.execute("SELECT MAX(id) FROM snapshots")
     snapshot_id = cursor.fetchone()[0]
-    cursor.execute("SELECT job FROM players WHERE snapshot_id = ?", (snapshot_id,))
-    jobs = [row[0] for row in cursor.fetchall()]
+    cursor.execute("SELECT job, level FROM players WHERE snapshot_id = ?", (snapshot_id,))
+    rows = [dict(row) for row in cursor.fetchall()]
     conn.close()
 
-    # Build per-job counts
     job_counts = {}
-    for job in jobs:
-        job_counts[job] = job_counts.get(job, 0) + 1
+    for r in rows:
+        job_counts[r["job"]] = job_counts.get(r["job"], 0) + 1
 
     # Group by class
     result = {}
@@ -562,7 +576,14 @@ def api_jobs():
                 "count": count,
             })
 
-    return jsonify(result)
+    # Tier counts (excluding base jobs and sub-11 beginners)
+    eligible = [r for r in rows if r["job"] != 0 or r["level"] >= 11]
+    tier_counts = {}
+    for tier, ids in TIER_JOB_IDS.items():
+        tier_counts[tier] = sum(1 for r in eligible if r["job"] in ids)
+    total = sum(tier_counts.values())
+
+    return jsonify({"classes": result, "tier_counts": tier_counts, "total": total})
 
 @app.route("/api/jobs/trends")
 def api_jobs_trends():

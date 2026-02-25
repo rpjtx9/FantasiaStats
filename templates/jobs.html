@@ -82,10 +82,10 @@ main { max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
 .loading { color: var(--muted); font-family: 'Share Tech Mono', monospace; font-size: 14px; padding: 40px; text-align: center; }
 
 /* Level dist branch charts */
-.branch-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 20px; margin-top: 4px; }
-.branch-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 16px; }
-.branch-title { font-family: 'Rajdhani', sans-serif; font-size: 14px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 12px; }
-.branch-chart-wrap { position: relative; height: 200px; }
+.branch-grid { display: grid; grid-template-columns: 1fr; gap: 24px; margin-top: 4px; }
+.branch-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 20px; }
+.branch-title { font-family: 'Rajdhani', sans-serif; font-size: 16px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }
+.branch-chart-wrap { position: relative; height: 300px; }
 </style>
 </head>
 <body>
@@ -105,6 +105,7 @@ main { max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
     <button class="filter-btn" data-class="Pirate">Pirate</button>
     <button class="filter-btn" data-class="Beginner">Beginner</button>
   </div>
+
 
   <div class="two-col">
     <div class="card">
@@ -339,6 +340,43 @@ async function renderLevelDist(filterClass) {
     charts[k].destroy(); delete charts[k];
   });
 
+  const TIER_JOB_IDS = {
+    '1st Job': [100,200,300,400,500],
+    '2nd Job': [110,120,130,210,220,230,310,320,410,420,510,520],
+    '3rd Job': [111,121,131,211,221,231,311,321,411,421,511,521],
+    '4th Job': [112,122,132,212,222,232,312,322,412,422,512,522],
+  };
+
+  function branchTierStats(branch) {
+    // Sum all bucket counts per job to get total per job_id
+    const jobTotals = {};
+    for (const j of branch.jobs) {
+      jobTotals[j.job_id] = Object.values(j.buckets).reduce((s, v) => s + v, 0);
+    }
+    const total = Object.values(jobTotals).reduce((s, v) => s + v, 0);
+    const get = tier => branch.jobs
+      .filter(j => TIER_JOB_IDS[tier]?.includes(j.job_id))
+      .reduce((s, j) => s + (jobTotals[j.job_id] || 0), 0);
+    return { total, t1: get('1st Job'), t2: get('2nd Job'), t3: get('3rd Job'), t4: get('4th Job') };
+  }
+
+  function branchStatHTML(stats) {
+    const items = [
+      { label: 'Total', value: stats.total },
+      { label: '1st', value: stats.t1 },
+      { label: '2nd', value: stats.t2 },
+      { label: '3rd', value: stats.t3 },
+      { label: '4th', value: stats.t4 },
+    ].filter(x => x.value > 0);
+    return `<div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px;justify-content:center;">
+      ${items.map(x => `
+        <div style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:8px 14px;text-align:center;min-width:60px;">
+          <div style="font-family:'Rajdhani',sans-serif;font-size:22px;font-weight:700;color:var(--accent);line-height:1;">${x.value.toLocaleString()}</div>
+          <div style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--muted);margin-top:2px;text-transform:uppercase;">${x.label}</div>
+        </div>`).join('')}
+    </div>`;
+  }
+
   let html = '';
   for (const [cls, clsBranches] of Object.entries(grouped)) {
     if (filterClass === 'All') {
@@ -348,7 +386,12 @@ async function renderLevelDist(filterClass) {
     html += '<div class="branch-grid">';
     for (const branch of clsBranches) {
       const id = `branch-${branch.class}-${branch.jobs[0].job_id}`;
-      html += `<div class="branch-card"><div class="branch-title">${branch.branch_name}</div><div class="branch-chart-wrap"><canvas id="${id}"></canvas></div></div>`;
+      const stats = branchTierStats(branch);
+      html += `<div class="branch-card">
+        <div class="branch-title">${branch.branch_name}</div>
+        ${branchStatHTML(stats)}
+        <div class="branch-chart-wrap"><canvas id="${id}"></canvas></div>
+      </div>`;
     }
     html += '</div>';
   }
@@ -380,14 +423,14 @@ async function renderLevelDist(filterClass) {
           legend: {
             display: branch.jobs.length > 1,
             position: 'bottom',
-            labels: { color: '#64748b', font: { family: 'Barlow', size: 11 }, boxWidth: 8, padding: 8 },
+            labels: { color: '#64748b', font: { family: 'Barlow', size: 13 }, boxWidth: 10, padding: 10 },
           },
           datalabels: { display: false },
           tooltip: { mode: 'index', intersect: false },
         },
         scales: {
-          x: { ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 10 }, maxRotation: 45 }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' } },
-          y: { ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 10 } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' } },
+          x: { ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 12 }, maxRotation: 45 }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' } },
+          y: { ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 12 } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' } },
         },
       },
     });
@@ -396,7 +439,9 @@ async function renderLevelDist(filterClass) {
 async function loadAll() {
   const res = await fetch('/api/jobs');
   if (!res.ok) return;
-  allJobData = await res.json();
+  const payload = await res.json();
+  allJobData = payload.classes;
+
   renderPopChart(allJobData, currentClass);
   renderBreakdown(allJobData, currentClass);
   await Promise.all([

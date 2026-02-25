@@ -544,7 +544,7 @@ main { max-width: 1600px; margin: 0 auto; padding: 32px 24px; }
 
     <div style="margin-top:16px;" class="card">
       <div class="card-title">Class Distribution (all ranked players)</div>
-      <div class="chart-wrap" style="height:220px">
+      <div class="chart-wrap" style="height:320px">
         <canvas id="chart-class-dist"></canvas>
       </div>
     </div>
@@ -682,46 +682,122 @@ async function loadLevelDist() {
 async function loadClassDist() {
   const res = await fetch('/api/class_distribution');
   const data = await res.json();
-  // Sort descending by count
-  const sorted = Object.entries(data).sort((a, b) => b[1] - a[1]);
-  const labels = sorted.map(x => x[0]);
-  const counts = sorted.map(x => x[1]);
-  const colors = labels.map(l => CLASS_COLORS[l] || '#aaa');
-  makeChart('chart-class-dist', 'bar', {
-    labels,
-    datasets: [{
-      data: counts,
-      backgroundColor: colors.map(c => c + '99'),
-      hoverBackgroundColor: colors.map(c => c + 'cc'),
-      borderColor: colors,
-      borderWidth: 1,
-      borderRadius: 4,
-    }],
-  }, {
-    indexAxis: 'y',
-    onHover: (evt) => { evt.native.target.style.cursor = 'pointer'; },
-    onClick: (evt, elements) => {
-      if (elements.length > 0) {
-        const label = labels[elements[0].index];
-        window.location.href = `/jobs?class=${encodeURIComponent(label)}`;
-      }
+
+  // Branch colors per class
+  const BRANCH_COLORS = {
+    // Warrior branches
+    'Fighter':      '#ff4444', 'Knight':       '#cc44ff', 'Spearman':     '#ff44aa',
+    // Magician branches
+    'Fire/Poison':  '#ff6600', 'Ice/Lightning':'#44aaff', 'Cleric':       '#cccccc',
+    // Archer branches
+    'Hunter':       '#33ff77', 'Crossbow':     '#cccc00',
+    // Thief branches
+    'Assassin':     '#4488ff', 'Bandit':       '#ff8844',
+    // Pirate branches
+    'Brawler':      '#ffdd00', 'Gunslinger':   '#00ffee',
+    // Beginner
+    'Beginner':     '#95a5a6',
+  };
+
+  // Sort classes by total count descending
+  const classTotals = Object.entries(data).map(([cls, branches]) => ({
+    cls,
+    total: Object.values(branches).reduce((s, v) => s + v, 0),
+  })).sort((a, b) => b.total - a.total);
+
+  const classLabels = classTotals.map(x => x.cls);
+
+  // Collect all unique branch names across all classes
+  const allBranches = [];
+  for (const { cls } of classTotals) {
+    for (const branch of Object.keys(data[cls])) {
+      if (!allBranches.includes(branch)) allBranches.push(branch);
+    }
+  }
+
+  // Build one dataset per branch
+  const datasets = allBranches.map(branch => ({
+    label: branch,
+    data: classLabels.map(cls => data[cls][branch] || 0),
+    backgroundColor: (BRANCH_COLORS[branch] || '#aaa') + 'bb',
+    hoverBackgroundColor: (BRANCH_COLORS[branch] || '#aaa') + 'ee',
+    borderColor: BRANCH_COLORS[branch] || '#aaa',
+    borderWidth: 1,
+  }));
+
+  // Sum labels plugin
+  const stackTotalPlugin = {
+    id: 'stackTotals',
+    afterDatasetsDraw(chart) {
+      const { ctx, scales: { x, y } } = chart;
+      classLabels.forEach((cls, i) => {
+        const total = classTotals.find(c => c.cls === cls).total;
+        const yPos = y.getPixelForValue(i);
+        const xPos = x.getPixelForValue(total);
+        ctx.save();
+        ctx.font = '11px "Share Tech Mono"';
+        ctx.fillStyle = '#e2e8f0';
+        ctx.textAlign = 'left';
+        ctx.fillText(total.toLocaleString(), xPos + 6, yPos + 4);
+        ctx.restore();
+      });
     },
-    plugins: {
-      legend: { display: false },
-      tooltip: { callbacks: { label: ctx => ` ${ctx.raw} players — click to explore` } },
-      datalabels: {
-        anchor: 'end',
-        align: 'right',
-        color: '#e2e8f0',
-        font: { family: 'Share Tech Mono', size: 11 },
-        formatter: val => val > 0 ? val : '',
+  };
+
+  if (charts['chart-class-dist']) charts['chart-class-dist'].destroy();
+  const ctx = document.getElementById('chart-class-dist');
+  charts['chart-class-dist'] = new Chart(ctx, {
+    type: 'bar',
+    plugins: [stackTotalPlugin, ChartDataLabels],
+    data: { labels: classLabels, datasets },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      onHover: (evt) => { evt.native.target.style.cursor = 'pointer'; },
+      onClick: (evt, elements) => {
+        if (elements.length > 0) {
+          const label = classLabels[elements[0].index];
+          window.location.href = `/jobs?class=${encodeURIComponent(label)}`;
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          mode: 'index',
+          intersect: true,
+          callbacks: {
+            title: items => items.length ? `${items[0].label} — click to explore` : '',
+            label: ctx => ctx.raw > 0 ? ` ${ctx.dataset.label}: ${ctx.raw.toLocaleString()}` : null,
+          },
+        },
+        datalabels: {
+          display: ctx => ctx.dataset.data[ctx.dataIndex] > 0,
+          anchor: 'center',
+          align: 'center',
+          color: '#0b0e1a',
+          font: { family: 'Share Tech Mono', size: 10, weight: 'bold' },
+          formatter: val => val > 30 ? val.toLocaleString() : '',
+        },
+      },
+      scales: {
+        x: {
+          stacked: true,
+          grace: '15%',
+          ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 12 } },
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          border: { color: '#1e2d47' },
+        },
+        y: {
+          stacked: true,
+          ticks: { color: '#e2e8f0', font: { family: 'Barlow', size: 15, weight: '500' } },
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          border: { color: '#1e2d47' },
+        },
       },
     },
-    scales: {
-      ...chartDefaults.scales,
-      y: { ...chartDefaults.scales.y, ticks: { color: '#e2e8f0', font: { family: 'Barlow', size: 15, weight: '500' } } },
-    },
   });
+
   // Hint text below chart
   const wrap = document.getElementById('chart-class-dist').parentElement;
   if (!wrap.querySelector('.chart-hint')) {
