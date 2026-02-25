@@ -51,6 +51,8 @@ main { max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
 }
 .sort-btn:hover { color: var(--text); border-color: var(--muted); }
 .sort-btn.active { color: var(--accent); border-color: var(--accent); background: rgba(0,212,255,0.08); }
+.sort-menu-item { font-family: 'Share Tech Mono', monospace; font-size: 11px; color: var(--muted); padding: 8px 14px; cursor: pointer; }
+.sort-menu-item:hover { background: var(--surface); color: var(--text); }
 .filter-btn[data-class="Warrior"].active    { color: #ff4444; border-color: #ff4444; background: rgba(255,68,68,0.08); }
 .filter-btn[data-class="Magician"].active   { color: #bb44ff; border-color: #bb44ff; background: rgba(187,68,255,0.08); }
 .filter-btn[data-class="Archer"].active     { color: #33ff77; border-color: #33ff77; background: rgba(51,255,119,0.08); }
@@ -118,9 +120,16 @@ main { max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
     <div class="card">
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
         <div class="card-title" style="margin-bottom:0;">Current Job Population by Branch</div>
-        <div style="display:flex;gap:6px;">
-          <button id="pop-sort-class" onclick="setPopSort(false)" class="sort-btn active" style="font-size:11px;padding:4px 10px;">CLASS ORDER</button>
-          <button id="pop-sort-desc" onclick="setPopSort(true)" class="sort-btn" style="font-size:11px;padding:4px 10px;">DESCENDING</button>
+        <div style="display:flex;gap:6px;position:relative;">
+          <button id="pop-sort-class" onclick="setPopSort('class')" class="sort-btn active" style="font-size:11px;padding:4px 10px;">CLASS ORDER</button>
+          <div style="position:relative;">
+            <button id="pop-sort-desc" onclick="toggleSortMenu()" class="sort-btn" style="font-size:11px;padding:4px 10px;">DESCENDING ▾</button>
+            <div id="sort-menu" style="display:none;position:absolute;right:0;top:calc(100% + 4px);background:var(--card);border:1px solid var(--border);border-radius:4px;z-index:50;min-width:130px;overflow:hidden;">
+              <div class="sort-menu-item" onclick="setPopSort('total')">By Total</div>
+              <div class="sort-menu-item" onclick="setPopSort('3rd')">By 3rd Job</div>
+              <div class="sort-menu-item" onclick="setPopSort('4th')">By 4th Job</div>
+            </div>
+          </div>
         </div>
       </div>
       <div class="chart-wrap"><canvas id="chart-job-pop"></canvas></div>
@@ -183,14 +192,29 @@ const chartDefaults = {
 let charts = {};
 let currentClass = 'All';
 let allJobData = null;
-let popSortDescending = false;
+let popSortMode = 'class'; // 'class' | 'total' | '3rd' | '4th'
 
-function setPopSort(descending) {
-  popSortDescending = descending;
-  document.getElementById('pop-sort-class').classList.toggle('active', !descending);
-  document.getElementById('pop-sort-desc').classList.toggle('active', descending);
+function toggleSortMenu() {
+  const menu = document.getElementById('sort-menu');
+  menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+
+function setPopSort(mode) {
+  popSortMode = mode;
+  document.getElementById('sort-menu').style.display = 'none';
+  const isClass = mode === 'class';
+  document.getElementById('pop-sort-class').classList.toggle('active', isClass);
+  document.getElementById('pop-sort-desc').classList.toggle('active', !isClass);
   if (allJobData) renderPopChart(allJobData, currentClass);
 }
+
+// Close sort menu when clicking outside
+document.addEventListener('click', e => {
+  if (!e.target.closest('#pop-sort-desc') && !e.target.closest('#sort-menu')) {
+    const menu = document.getElementById('sort-menu');
+    if (menu) menu.style.display = 'none';
+  }
+});
 
 function destroyChart(id) {
   if (charts[id]) { charts[id].destroy(); delete charts[id]; }
@@ -202,7 +226,7 @@ function renderPopChart(jobData, filterClass) {
 
   // Branch definitions matching the backend
   const CLASS_BRANCHES_POP = {
-    Warrior:  { Fighter: [110,111,112], Knight: [120,121,122], Spearman: [130,131,132] },
+    Warrior:  { Fighter: [110,111,112], Page: [120,121,122], Spearman: [130,131,132] },
     Magician: { 'Fire/Poison': [210,211,212], 'Ice/Lightning': [220,221,222], Cleric: [230,231,232] },
     Archer:   { Hunter: [310,311,312], Crossbow: [320,321,322] },
     Thief:    { Assassin: [410,411,412], Bandit: [420,421,422] },
@@ -234,7 +258,23 @@ function renderPopChart(jobData, filterClass) {
     clsBranches.sort((a, b) => b.total - a.total);
     branchRows.push(...clsBranches);
   }
-  if (popSortDescending) branchRows.sort((a, b) => b.total - a.total);
+  if (popSortMode !== 'class') {
+    const TIER_3RD = [111,121,131,211,221,231,311,321,411,421,511,521];
+    const TIER_4TH = [112,122,132,212,222,232,312,322,412,422,512,522];
+    branchRows.sort((a, b) => {
+      if (popSortMode === '3rd') {
+        const aVal = a.jobIds.filter(id => TIER_3RD.includes(id)).reduce((s, id) => s + (jobLookup[id]?.count || 0), 0);
+        const bVal = b.jobIds.filter(id => TIER_3RD.includes(id)).reduce((s, id) => s + (jobLookup[id]?.count || 0), 0);
+        return bVal - aVal;
+      }
+      if (popSortMode === '4th') {
+        const aVal = a.jobIds.filter(id => TIER_4TH.includes(id)).reduce((s, id) => s + (jobLookup[id]?.count || 0), 0);
+        const bVal = b.jobIds.filter(id => TIER_4TH.includes(id)).reduce((s, id) => s + (jobLookup[id]?.count || 0), 0);
+        return bVal - aVal;
+      }
+      return b.total - a.total; // 'total'
+    });
+  }
 
   const branchLabels = branchRows.map(b => b.branchName);
 
@@ -560,7 +600,7 @@ if (urlClass) {
   }
 }
 
-setPopSort(false);
+setPopSort('class');
 loadAll();
 </script>
 </body>

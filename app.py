@@ -236,7 +236,7 @@ def api_level_distribution():
 @app.route("/api/class_distribution")
 def api_class_distribution():
     CLASS_BRANCHES_DIST = {
-        "Warrior":  {"Fighter": [110,111,112], "Knight": [120,121,122], "Spearman": [130,131,132]},
+        "Warrior":  {"Fighter": [110,111,112], "Page": [120,121,122], "Spearman": [130,131,132]},
         "Magician": {"Fire/Poison": [210,211,212], "Ice/Lightning": [220,221,222], "Cleric": [230,231,232]},
         "Archer":   {"Hunter": [310,311,312], "Crossbow": [320,321,322]},
         "Thief":    {"Assassin": [410,411,412], "Bandit": [420,421,422]},
