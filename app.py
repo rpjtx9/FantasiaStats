@@ -236,11 +236,11 @@ def api_level_distribution():
 @app.route("/api/class_distribution")
 def api_class_distribution():
     CLASS_BRANCHES_DIST = {
-        "Warrior":  {"Fighter": [100,110,111,112], "Page": [120,121,122], "Spearman": [130,131,132]},
-        "Magician": {"Fire/Poison": [200,210,211,212], "Ice/Lightning": [220,221,222], "Cleric": [230,231,232]},
-        "Archer":   {"Hunter": [300,310,311,312], "Crossbow": [320,321,322]},
-        "Thief":    {"Assassin": [400,410,411,412], "Bandit": [420,421,422]},
-        "Pirate":   {"Brawler": [500,510,511,512], "Gunslinger": [520,521,522]},
+        "Warrior":  {"1st Job": [100], "Fighter": [110,111,112], "Page": [120,121,122], "Spearman": [130,131,132]},
+        "Magician": {"1st Job": [200], "Fire/Poison": [210,211,212], "Ice/Lightning": [220,221,222], "Cleric": [230,231,232]},
+        "Archer":   {"1st Job": [300], "Hunter": [310,311,312], "Crossbow": [320,321,322]},
+        "Thief":    {"1st Job": [400], "Assassin": [410,411,412], "Bandit": [420,421,422]},
+        "Pirate":   {"1st Job": [500], "Brawler": [510,511,512], "Gunslinger": [520,521,522]},
         "Beginner": {"Beginner": [0]},
     }
 
