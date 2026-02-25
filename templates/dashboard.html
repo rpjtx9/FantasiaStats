@@ -105,7 +105,30 @@ nav {
 .nav-links a:hover { color: var(--text); background: rgba(255,255,255,0.05); }
 .nav-links a.active { color: var(--accent); background: rgba(0,212,255,0.08); }
 
-.chart-hint {
+.nav-hamburger {
+  display: none;
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 6px 10px;
+  cursor: pointer;
+  flex-direction: column;
+  gap: 4px;
+}
+.nav-hamburger span {
+  display: block;
+  width: 18px;
+  height: 2px;
+  background: var(--muted);
+  border-radius: 2px;
+  transition: all 0.2s;
+}
+.nav-mobile-menu {
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+}
   text-align: center;
   font-family: 'Share Tech Mono', monospace;
   font-size: 11px;
@@ -394,8 +417,14 @@ main { max-width: 1600px; margin: 0 auto; padding: 32px 24px; }
 }
 @media (max-width: 768px) {
   .stat-row { grid-template-columns: repeat(3, 1fr); }
-  .grid-2, .grid-1-2 { grid-template-columns: 1fr; }
+  .grid-2, .grid-1-2, .grid-3 { grid-template-columns: 1fr; }
   .tier-grid { grid-template-columns: 1fr 1fr; }
+  /* Hamburger nav */
+  .nav-hamburger { display: flex !important; }
+  .nav-links, .nav-controls { display: none !important; }
+  .nav-links.open, .nav-controls.open { display: flex !important; width: 100%; flex-wrap: wrap; }
+  nav { flex-wrap: wrap; }
+  .nav-mobile-menu { display: block !important; width: 100%; border-top: 1px solid var(--border); padding-top: 8px; margin-top: 4px; }
 }
 .heatmap-wrap { overflow-x: auto; }
 .heatmap-table { border-collapse: collapse; min-width: 100%; font-size: 15px; }
@@ -470,7 +499,7 @@ main { max-width: 1600px; margin: 0 auto; padding: 32px 24px; }
 <body>
 
 <nav>
-  <div class="nav-logo">FantasiaStats<span>.win</span></div>
+  <a href="/" style="text-decoration:none;"><div class="nav-logo">FantasiaStats<span>.win</span></div></a>
   <div class="nav-links">
     <a href="#activity" class="active">Activity</a>
     <a href="#levels">Levels</a>
@@ -491,6 +520,31 @@ main { max-width: 1600px; margin: 0 auto; padding: 32px 24px; }
     <input type="date" id="date-start" class="date-input">
     <span class="date-sep">→</span>
     <input type="date" id="date-end" class="date-input">
+  </div>
+  <button class="nav-hamburger" id="nav-hamburger" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="nav-mobile-menu" id="nav-mobile-menu">
+    <div style="display:flex;flex-wrap:wrap;gap:4px;padding-bottom:4px;">
+      <a href="#activity" style="color:var(--muted);text-decoration:none;font-size:14px;letter-spacing:.06em;text-transform:uppercase;padding:6px 12px;border-radius:4px;" onclick="closeMobileMenu()">Activity</a>
+      <a href="#levels" style="color:var(--muted);text-decoration:none;font-size:14px;letter-spacing:.06em;text-transform:uppercase;padding:6px 12px;border-radius:4px;" onclick="closeMobileMenu()">Levels</a>
+      <a href="#health" style="color:var(--muted);text-decoration:none;font-size:14px;letter-spacing:.06em;text-transform:uppercase;padding:6px 12px;border-radius:4px;" onclick="closeMobileMenu()">Health</a>
+      <a href="#retention" style="color:var(--muted);text-decoration:none;font-size:14px;letter-spacing:.06em;text-transform:uppercase;padding:6px 12px;border-radius:4px;" onclick="closeMobileMenu()">Retention</a>
+      <a href="/guild" style="color:var(--muted);text-decoration:none;font-size:14px;letter-spacing:.06em;text-transform:uppercase;padding:6px 12px;border-radius:4px;">Guild ↗</a>
+      <a href="/player" style="color:var(--muted);text-decoration:none;font-size:14px;letter-spacing:.06em;text-transform:uppercase;padding:6px 12px;border-radius:4px;">Player ↗</a>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding-top:4px;border-top:1px solid var(--border);">
+      <span style="font-size:12px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;">Window:</span>
+      <button class="preset-btn mobile-preset" data-hours="12">12h</button>
+      <button class="preset-btn mobile-preset active" data-hours="24">24h</button>
+      <button class="preset-btn mobile-preset" data-hours="48">48h</button>
+      <button class="preset-btn mobile-preset" data-hours="168">7d</button>
+      <button class="preset-btn mobile-preset" data-hours="720">30d</button>
+      <button class="preset-btn mobile-preset" data-hours="87600">All</button>
+      <input type="date" id="date-start-mobile" class="date-input">
+      <span class="date-sep">→</span>
+      <input type="date" id="date-end-mobile" class="date-input">
+    </div>
   </div>
 </nav>
 
@@ -1124,6 +1178,46 @@ const observer = new IntersectionObserver(entries => {
   });
 }, { threshold: 0.3 });
 sections.forEach(s => observer.observe(s));
+
+// ─── Hamburger Menu ───────────────────────────────────────────────────────────
+const hamburger = document.getElementById('nav-hamburger');
+const mobileMenu = document.getElementById('nav-mobile-menu');
+
+hamburger.addEventListener('click', () => {
+  const open = mobileMenu.style.display === 'flex';
+  mobileMenu.style.display = open ? 'none' : 'flex';
+  mobileMenu.style.flexDirection = 'column';
+});
+
+function closeMobileMenu() {
+  mobileMenu.style.display = 'none';
+}
+
+// Sync mobile preset buttons with desktop ones
+document.querySelectorAll('.mobile-preset').forEach(btn => {
+  btn.addEventListener('click', () => {
+    currentHours = parseInt(btn.dataset.hours);
+    currentStart = null;
+    currentEnd = null;
+    document.querySelectorAll('.preset-btn').forEach(b => b.classList.toggle('active', b.dataset.hours === btn.dataset.hours));
+    document.getElementById('date-start-mobile').value = '';
+    document.getElementById('date-end-mobile').value = '';
+    loadAll();
+    closeMobileMenu();
+  });
+});
+
+document.getElementById('date-start-mobile').addEventListener('change', e => {
+  currentStart = e.target.value;
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  loadAll();
+});
+
+document.getElementById('date-end-mobile').addEventListener('change', e => {
+  currentEnd = e.target.value;
+  document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+  loadAll();
+});
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 async function reloadAll() {
