@@ -676,7 +676,7 @@ def api_jobs_level_distribution():
     cursor = conn.cursor()
     cursor.execute("SELECT MAX(id) FROM snapshots")
     snapshot_id = cursor.fetchone()[0]
-    cursor.execute("SELECT job, level FROM players WHERE snapshot_id = ?", (snapshot_id,))
+    cursor.execute("SELECT job, level FROM players WHERE snapshot_id = ? AND (job != 0 OR level >= 11)", (snapshot_id,))
     players = [dict(row) for row in cursor.fetchall()]
     conn.close()
 
