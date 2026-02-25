@@ -44,6 +44,13 @@ main { max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
 }
 .filter-btn:hover { color: var(--text); border-color: var(--muted); }
 .filter-btn.active { color: var(--accent); border-color: var(--accent); background: rgba(0,212,255,0.08); }
+.sort-btn {
+  background: var(--card); border: 1px solid var(--border); color: var(--muted);
+  font-family: 'Share Tech Mono', monospace; font-size: 13px; padding: 6px 14px;
+  border-radius: 4px; cursor: pointer; transition: all 0.15s;
+}
+.sort-btn:hover { color: var(--text); border-color: var(--muted); }
+.sort-btn.active { color: var(--accent); border-color: var(--accent); background: rgba(0,212,255,0.08); }
 .filter-btn[data-class="Warrior"].active    { color: #ff4444; border-color: #ff4444; background: rgba(255,68,68,0.08); }
 .filter-btn[data-class="Magician"].active   { color: #bb44ff; border-color: #bb44ff; background: rgba(187,68,255,0.08); }
 .filter-btn[data-class="Archer"].active     { color: #33ff77; border-color: #33ff77; background: rgba(51,255,119,0.08); }
@@ -109,7 +116,13 @@ main { max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
 
   <div class="two-col">
     <div class="card">
-      <div class="card-title">Current Job Population by Branch</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div class="card-title" style="margin-bottom:0;">Current Job Population by Branch</div>
+        <div style="display:flex;gap:6px;">
+          <button id="pop-sort-class" onclick="setPopSort(false)" class="sort-btn active" style="font-size:11px;padding:4px 10px;">CLASS ORDER</button>
+          <button id="pop-sort-desc" onclick="setPopSort(true)" class="sort-btn" style="font-size:11px;padding:4px 10px;">DESCENDING</button>
+        </div>
+      </div>
       <div class="chart-wrap"><canvas id="chart-job-pop"></canvas></div>
     </div>
     <div class="card">
@@ -170,6 +183,14 @@ const chartDefaults = {
 let charts = {};
 let currentClass = 'All';
 let allJobData = null;
+let popSortDescending = false;
+
+function setPopSort(descending) {
+  popSortDescending = descending;
+  document.getElementById('pop-sort-class').classList.toggle('active', !descending);
+  document.getElementById('pop-sort-desc').classList.toggle('active', descending);
+  if (allJobData) renderPopChart(allJobData, currentClass);
+}
 
 function destroyChart(id) {
   if (charts[id]) { charts[id].destroy(); delete charts[id]; }
@@ -195,14 +216,16 @@ function renderPopChart(jobData, filterClass) {
     for (const j of jobs) jobLookup[j.job_id] = j;
   }
 
-  // Determine which classes to include
-  const classesToShow = filterClass === 'All'
-    ? Object.keys(CLASS_BRANCHES_POP).filter(c => c !== 'Beginner')
+  const CLASS_ORDER = ['Warrior', 'Magician', 'Archer', 'Thief', 'Pirate', 'Beginner'];
+
+  // Determine which classes to include in fixed job-ID order
+  const classesToOrder = filterClass === 'All'
+    ? CLASS_ORDER.filter(c => c !== 'Beginner')
     : [filterClass];
 
-  // Build branch rows: one row per branch, sorted by total descending
+  // Build branch rows: fixed class order or descending by total
   const branchRows = [];
-  for (const cls of classesToShow) {
+  for (const cls of classesToOrder) {
     const branches = CLASS_BRANCHES_POP[cls] || {};
     for (const [branchName, jobIds] of Object.entries(branches)) {
       const total = jobIds.reduce((s, id) => s + (jobLookup[id]?.count || 0), 0);
@@ -210,7 +233,7 @@ function renderPopChart(jobData, filterClass) {
       branchRows.push({ branchName, jobIds, cls, total });
     }
   }
-  branchRows.sort((a, b) => b.total - a.total);
+  if (popSortDescending) branchRows.sort((a, b) => b.total - a.total);
 
   const branchLabels = branchRows.map(b => b.branchName);
 
@@ -513,7 +536,7 @@ async function loadAll() {
 // ─── Filter buttons ───────────────────────────────────────────────────────────
 document.querySelectorAll('.filter-btn').forEach(btn => {
   btn.addEventListener('click', async () => {
-    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.filter-btn[data-class]').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     currentClass = btn.dataset.class;
     renderPopChart(allJobData, currentClass);
@@ -536,6 +559,7 @@ if (urlClass) {
   }
 }
 
+setPopSort(false);
 loadAll();
 </script>
 </body>
