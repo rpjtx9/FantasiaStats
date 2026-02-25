@@ -223,15 +223,16 @@ function renderPopChart(jobData, filterClass) {
     ? CLASS_ORDER
     : [filterClass];
 
-  // Build branch rows: fixed class order or descending by total
+  // Build branch rows: fixed class order, branches sorted descending within each class
   const branchRows = [];
   for (const cls of classesToOrder) {
     const branches = CLASS_BRANCHES_POP[cls] || {};
-    for (const [branchName, jobIds] of Object.entries(branches)) {
-      const total = jobIds.reduce((s, id) => s + (jobLookup[id]?.count || 0), 0);
-      if (total === 0) continue;
-      branchRows.push({ branchName, jobIds, cls, total });
-    }
+    const clsBranches = Object.entries(branches).map(([branchName, jobIds]) => ({
+      branchName, jobIds, cls,
+      total: jobIds.reduce((s, id) => s + (jobLookup[id]?.count || 0), 0),
+    })).filter(b => b.total > 0);
+    clsBranches.sort((a, b) => b.total - a.total);
+    branchRows.push(...clsBranches);
   }
   if (popSortDescending) branchRows.sort((a, b) => b.total - a.total);
 
