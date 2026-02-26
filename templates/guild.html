@@ -184,7 +184,7 @@ async function loadGuild() {
     <div class="card">
       <div class="guild-col-title ${col.cls}">${col.title}</div>
       ${(d[col.key] || []).map((p, i) => `
-        <div class="player-row">
+        <div class="player-row" style="cursor:pointer;border-radius:4px;transition:background 0.15s;" onclick="window.location.href='/player/${encodeURIComponent(p.name)}'" onmouseover="this.style.background='rgba(255,255,255,0.04)'" onmouseout="this.style.background=''">
           <div class="player-rank">${i+1}</div>
           <img src="/icons/${(p.class||'beginner').toLowerCase()}.png"
                style="width:26px;height:26px;object-fit:contain;flex-shrink:0;"

@@ -284,6 +284,12 @@ def api_activity():
     conn = get_connection()
     cursor = conn.cursor()
 
+    # Find the snapshot immediately before prev to use as exclusive lower bound,
+    # so that prev's own activity rows (which represent activity up to prev) are included
+    cursor.execute("SELECT id FROM snapshots WHERE id < ? ORDER BY id DESC LIMIT 1", (prev_id,))
+    before_prev = cursor.fetchone()
+    lower_bound = before_prev[0] if before_prev else prev_id - 1
+
     cursor.execute("""
         SELECT pa.name, SUM(pa.exp_gained) as exp_gained, p.job, p.level
         FROM player_activity pa
@@ -291,7 +297,7 @@ def api_activity():
         WHERE pa.snapshot_id IN (SELECT id FROM snapshots WHERE id > ? AND id <= ?)
         GROUP BY pa.name
         ORDER BY exp_gained DESC
-    """, (latest_id, prev_id, latest_id))
+    """, (latest_id, lower_bound, latest_id))
     active = [dict(row) for row in cursor.fetchall()]
 
     cursor.execute("""
@@ -345,16 +351,41 @@ def api_server_health():
     total_rows = [dict(row) for row in cursor.fetchall()]
 
     today = datetime.now().strftime("%Y-%m-%d")
-    cursor.execute("""
-        SELECT substr(s.timestamp, 1, 10) as day,
-               COUNT(DISTINCT pa.name) as active_count
-        FROM snapshots s
-        JOIN player_activity pa ON pa.snapshot_id = s.id
-        WHERE substr(s.timestamp, 1, 10) < ?
-        GROUP BY day
-        ORDER BY day
-    """, (today,))
-    active_rows = [dict(row) for row in cursor.fetchall()]
+    cursor.execute("SELECT id, timestamp FROM snapshots ORDER BY timestamp")
+    all_snapshots = [dict(row) for row in cursor.fetchall()]
+
+    # Group snapshots by day
+    from itertools import groupby
+    days = {}
+    for s in all_snapshots:
+        day = s["timestamp"][:10]
+        if day not in days:
+            days[day] = []
+        days[day].append(s)
+
+    active_rows = []
+    for day in sorted(days):
+        if day >= today:
+            continue
+        day_snaps = days[day]
+        min_id = day_snaps[0]["id"]
+        max_id = day_snaps[-1]["id"]
+        # Find the snapshot just before this day to use as the lower bound
+        prev_snap = next((s for s in reversed(all_snapshots) if s["id"] < min_id), None)
+        lower_id = prev_snap["id"] if prev_snap else min_id - 1
+        next_snap = next((s for s in all_snapshots if s["id"] > max_id), None)
+        upper_id = next_snap["id"] if next_snap else max_id
+        cursor.execute("""
+            SELECT COUNT(DISTINCT pa.name) as cnt
+            FROM player_activity pa
+            WHERE pa.snapshot_id IN (
+                SELECT id FROM snapshots WHERE id > ? AND id <= ?
+            )
+        """, (lower_id, upper_id))
+        count = cursor.fetchone()["cnt"]
+        if prev_snap is None:
+            continue
+        active_rows.append({"day": day, "active_count": count})
     conn.close()
 
     return jsonify({
