@@ -521,12 +521,29 @@ def api_player(name):
 
     conn = get_connection()
     cursor = conn.cursor()
+
+    # Resolve canonical name (case-insensitive match)
+    cursor.execute("SELECT DISTINCT name FROM players WHERE LOWER(name) = LOWER(?)", (name,))
+    canonical = cursor.fetchone()
+    if canonical:
+        name = canonical[0]
+
     cursor.execute("""
         SELECT s.timestamp, p.level, p.experience, p.rank, p.fame, p.quests, p.cards, p.job
         FROM players p JOIN snapshots s ON p.snapshot_id = s.id
         WHERE p.name = ? ORDER BY s.timestamp
     """, (name,))
     rows = [dict(row) for row in cursor.fetchall()]
+
+    # Find last snapshot where player had any exp activity (unfiltered)
+    cursor.execute("""
+        SELECT MAX(s.timestamp) as last_active
+        FROM player_activity pa
+        JOIN snapshots s ON pa.snapshot_id = s.id
+        WHERE pa.name = ? AND pa.exp_gained > 0
+    """, (name,))
+    last_active_row = cursor.fetchone()
+    last_active = last_active_row["last_active"] if last_active_row else None
     conn.close()
 
     if not rows:
@@ -572,6 +589,7 @@ def api_player(name):
         "total_exp_gained": total_exp,
         "levels_gained": latest["level"] - rows[0]["level"],
         "first_seen": rows[0]["timestamp"],
+        "last_active": last_active,
         "days_tracked": (datetime.strptime(latest["timestamp"], TS_FMT) - datetime.strptime(rows[0]["timestamp"], TS_FMT)).days,
         "data_points": data_points,
     })
@@ -674,7 +692,7 @@ def api_players_search():
         SELECT DISTINCT p.name, p.level, p.job
         FROM players p
         WHERE p.snapshot_id = (SELECT MAX(id) FROM snapshots)
-        AND p.name LIKE ? LIMIT 10
+        AND LOWER(p.name) LIKE LOWER(?) LIMIT 10
     """, (f"%{q}%",))
     rows = [{"name": r["name"], "level": r["level"], "job_name": JOB_NAMES.get(r["job"], "?")} for r in cursor.fetchall()]
     conn.close()

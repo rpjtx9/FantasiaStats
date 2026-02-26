@@ -239,8 +239,35 @@ async function loadPlayer(name) {
       <img src="/icons/${(d.class||'beginner').toLowerCase()}.png"
            style="width:52px;height:52px;object-fit:contain;flex-shrink:0;"
            onerror="this.style.display='none'">
-      <div>
-        <div class="scorecard-name">${d.name}</div>
+      <div style="flex:1;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div class="scorecard-name">${d.name}</div>
+          ${(() => {
+            const isActive = d.last_active && (() => {
+              const t = d.last_active.replace('_',' ').replace(/-(\d{2})-(\d{2})$/, ':$1:$2');
+              return (new Date() - new Date(t)) < 30*24*60*60*1000;
+            })();
+            let color, label, tooltip;
+            if (!d.last_active) {
+              color = '#64748b'; label = 'Inactive';
+              tooltip = 'Never seen active';
+            } else {
+              const t = d.last_active.replace('_',' ').replace(/-(\d{2})-(\d{2})$/, ':$1:$2');
+              const daysAgo = Math.floor((new Date() - new Date(t)) / (1000*60*60*24));
+              if (isActive) {
+                color = '#22c55e'; label = 'Active';
+                tooltip = daysAgo === 0 ? 'Active today' : `Last active ${daysAgo}d ago`;
+              } else {
+                color = '#64748b'; label = 'Inactive';
+                tooltip = `Last active ${daysAgo}d ago`;
+              }
+            }
+            return `<div style="display:flex;align-items:center;gap:5px;" title="${tooltip}">
+              <div style="width:8px;height:8px;border-radius:50%;background:${color};${isActive ? 'box-shadow:0 0 6px '+color+';' : ''}flex-shrink:0;"></div>
+              <span style="font-size:11px;color:${color};font-family:'Share Tech Mono',monospace;letter-spacing:.06em;text-transform:uppercase;">${label}</span>
+            </div>`;
+          })()}
+        </div>
         <div class="scorecard-job">${d.job_name} &nbsp;·&nbsp; Rank #${d.rank}</div>
       </div>
     </div>
