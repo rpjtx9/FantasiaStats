@@ -598,6 +598,25 @@ def api_player(name):
 def jobs_page():
     return render_template("jobs.html")
 
+@app.route("/api/players_by_job/<int:job_id>")
+def api_players_by_job(job_id):
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT p.name, p.level, p.rank
+        FROM players p
+        WHERE p.snapshot_id = (SELECT MAX(id) FROM snapshots)
+        AND p.job = ?
+        AND (p.job != 0 OR p.level >= 11)
+        ORDER BY p.rank
+    """, (job_id,))
+    players = [dict(r) for r in cursor.fetchall()]
+    conn.close()
+    return jsonify({
+        "job_name": JOB_NAMES.get(job_id, "Unknown"),
+        "players": players,
+    })
+
 @app.route("/api/jobs")
 def api_jobs():
     """Current job populations from latest snapshot, grouped by class."""

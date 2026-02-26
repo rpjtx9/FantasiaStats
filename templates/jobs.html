@@ -292,6 +292,7 @@ function renderPopChart(jobData, filterClass) {
     const color = JOB_COLORS[job_id] || '#aaa';
     return {
       label: j?.job_name || String(job_id),
+      _jobId: job_id,
       data: branchRows.map(b => b.jobIds.includes(job_id) ? (j?.count || 0) : 0),
       backgroundColor: color + 'bb',
       hoverBackgroundColor: color + 'ee',
@@ -359,6 +360,13 @@ function renderPopChart(jobData, filterClass) {
           grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' },
         },
       },
+      onHover: (e, elements) => { e.native.target.style.cursor = elements.length ? 'pointer' : 'default'; },
+        onClick: (e, elements) => {
+          if (!elements.length) return;
+          const ds = charts['chart-job-pop'].data.datasets[elements[0].datasetIndex];
+          const jobId = ds._jobId;
+          if (jobId !== undefined) openJobModal(jobId, ds.label);
+        },
     },
   });
 }
@@ -538,6 +546,7 @@ async function renderLevelDist(filterClass) {
         labels: branch.labels,
         datasets: branch.jobs.map(j => ({
           label: j.job_name,
+          _jobId: j.job_id,
           data: branch.labels.map(lbl => j.buckets[lbl] || 0),
           backgroundColor: (JOB_COLORS[j.job_id] || '#aaa') + '99',
           borderColor: JOB_COLORS[j.job_id] || '#aaa',
@@ -560,6 +569,12 @@ async function renderLevelDist(filterClass) {
         scales: {
           x: { ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 12 }, maxRotation: 45 }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' } },
           y: { ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 12 } }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' } },
+        },
+        onHover: (e, elements) => { e.native.target.style.cursor = elements.length ? 'pointer' : 'default'; },
+        onClick: (e, elements) => {
+          if (!elements.length) return;
+          const ds = charts[id].data.datasets[elements[0].datasetIndex];
+          if (ds._jobId !== undefined) openJobModal(ds._jobId, ds.label);
         },
       },
     });
@@ -608,5 +623,77 @@ if (urlClass) {
 setPopSort('class');
 loadAll();
 </script>
+<!-- Job Players Modal -->
+<div id="job-modal" style="display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);align-items:center;justify-content:center;">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:8px;width:min(480px,90vw);max-height:80vh;display:flex;flex-direction:column;">
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid var(--border);">
+      <div id="job-modal-title" style="font-family:'Rajdhani',sans-serif;font-size:18px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--text);"></div>
+      <button onclick="closeJobModal()" style="background:none;border:none;color:var(--muted);font-size:20px;cursor:pointer;line-height:1;padding:0 4px;">✕</button>
+    </div>
+    <div style="padding:10px 20px;border-bottom:1px solid var(--border);">
+      <input id="job-modal-search" type="text" placeholder="Search players..." oninput="filterJobModal()"
+        style="width:100%;background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:'Barlow',sans-serif;font-size:13px;padding:6px 10px;border-radius:4px;outline:none;box-sizing:border-box;">
+    </div>
+    <div id="job-modal-list" style="overflow-y:auto;flex:1;padding:8px 0;"></div>
+    <div id="job-modal-count" style="padding:10px 20px;border-top:1px solid var(--border);font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--muted);letter-spacing:.04em;"></div>
+  </div>
+</div>
+
+<script>
+let jobModalPlayers = [];
+
+async function openJobModal(jobId, jobName) {
+  const modal = document.getElementById('job-modal');
+  document.getElementById('job-modal-title').textContent = jobName;
+  document.getElementById('job-modal-search').value = '';
+  document.getElementById('job-modal-list').innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-family:\'Share Tech Mono\',monospace;font-size:12px;">Loading...</div>';
+  document.getElementById('job-modal-count').textContent = '';
+  modal.style.display = 'flex';
+
+  const res = await fetch(`/api/players_by_job/${jobId}`);
+  const data = await res.json();
+  jobModalPlayers = data.players;
+  renderJobModal(jobModalPlayers);
+}
+
+function renderJobModal(players) {
+  const list = document.getElementById('job-modal-list');
+  document.getElementById('job-modal-count').textContent = `${players.length} player${players.length !== 1 ? 's' : ''}`;
+  if (!players.length) {
+    list.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-family:\'Share Tech Mono\',monospace;font-size:12px;">No players found</div>';
+    return;
+  }
+  list.innerHTML = players.map(p => `
+    <div onclick="window.location.href='/player/${encodeURIComponent(p.name)}'"
+         style="display:flex;align-items:center;gap:12px;padding:8px 20px;cursor:pointer;transition:background 0.1s;"
+         onmouseover="this.style.background='rgba(255,255,255,0.04)'"
+         onmouseout="this.style.background=''">
+      <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--muted);width:32px;text-align:right;flex-shrink:0;">#${p.rank}</div>
+      <div style="flex:1;">
+        <div style="font-size:14px;font-weight:600;color:var(--text);">${p.name}</div>
+      </div>
+      <div style="font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--accent);">Lv.${p.level}</div>
+    </div>
+  `).join('');
+}
+
+function filterJobModal() {
+  const q = document.getElementById('job-modal-search').value.toLowerCase();
+  renderJobModal(q ? jobModalPlayers.filter(p => p.name.toLowerCase().includes(q)) : jobModalPlayers);
+}
+
+function closeJobModal() {
+  document.getElementById('job-modal').style.display = 'none';
+}
+
+document.getElementById('job-modal').addEventListener('click', e => {
+  if (e.target === document.getElementById('job-modal')) closeJobModal();
+});
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeJobModal();
+});
+</script>
+
 </body>
 </html>
