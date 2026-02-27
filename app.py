@@ -356,12 +356,14 @@ def api_server_health():
 
     # Group snapshots by day
     from itertools import groupby
+    # Group snapshots by logical day with 10-minute grace on each side of midnight
     days = {}
     for s in all_snapshots:
-        day = s["timestamp"][:10]
-        if day not in days:
-            days[day] = []
-        days[day].append(s)
+        ts = datetime.strptime(s["timestamp"], TS_FMT)
+        # Shift timestamp forward by 10 minutes — anything within 10min of midnight
+        # gets attributed to the following day
+        logical_day = (ts + timedelta(minutes=10)).strftime("%Y-%m-%d")
+        days.setdefault(logical_day, []).append(s)
 
     active_rows = []
     for day in sorted(days):
