@@ -688,6 +688,7 @@ function fmtTs(ts) {
 const chartDefaults = {
   responsive: true,
   maintainAspectRatio: false,
+  layout: { padding: { top: 20 } },
   plugins: { legend: { display: false } },
   scales: {
     x: {
@@ -1098,15 +1099,25 @@ async function loadServerHealth() {
   const data = await res.json();
   if (!data.total || !data.total.length) return;
 
+  const healthLabelStyle = len => ({
+    display: ctx => ctx.dataIndex % Math.ceil(len / 12) === 0,
+    anchor: 'end',
+    align: 'top',
+    offset: 4,
+    color: '#94a3b8',
+    font: { family: 'Share Tech Mono', size: 10 },
+    formatter: val => val.toLocaleString(),
+  });
+
   makeChart('chart-health-total', 'line', {
     labels: data.total.map(r => r.label),
     datasets: [{ data: data.total.map(r => r.total_players), borderColor: '#00d4ff', backgroundColor: 'rgba(0,212,255,0.08)', fill: true, tension: 0.3, pointRadius: 2 }],
-  });
+  }, { plugins: { datalabels: healthLabelStyle(data.total.length) } });
 
   makeChart('chart-health-active', 'line', {
     labels: data.active.map(r => r.label),
     datasets: [{ data: data.active.map(r => r.active_count), borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.08)', fill: true, tension: 0.3, pointRadius: 2 }],
-  });
+  }, { plugins: { datalabels: healthLabelStyle(data.active.length) } });
 }
 
 // ─── Guild Card ───────────────────────────────────────────────────────────────
