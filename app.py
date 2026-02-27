@@ -373,8 +373,9 @@ def api_server_health():
         # Find the snapshot just before this day to use as the lower bound
         prev_snap = next((s for s in reversed(all_snapshots) if s["id"] < min_id), None)
         lower_id = prev_snap["id"] if prev_snap else min_id - 1
-        next_snap = next((s for s in all_snapshots if s["id"] > max_id), None)
-        upper_id = next_snap["id"] if next_snap else max_id
+        next_day = (datetime.strptime(day, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
+        next_day_snaps = days.get(next_day, [])
+        upper_id = next_day_snaps[0]["id"] if next_day_snaps else max_id
         cursor.execute("""
             SELECT COUNT(DISTINCT pa.name) as cnt
             FROM player_activity pa
