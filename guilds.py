@@ -12,7 +12,7 @@ GUILDS = {
         "Ljsasonl", "FireFist", "Oban", "Nightnoor", "Leroy", "HARPER", "iLucas",
         "IPhone16Pro", "peet", "yoni", "SinDee", "SacrificeGuy", "Yvannova", "Suga", "Kenzow",
         "Adeesin", "Bobdor2", "Efralen02", "Crodie", "Celeste", "Marin",  "irriducibili",
-        "Shaui"
+        "Shaui", "Marin"
     ],
     # Add more guilds here:
     # "AnotherGuild": ["Player1", "Player2", ...],
