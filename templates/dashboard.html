@@ -735,15 +735,38 @@ async function loadLevelDist() {
   });
 }
 
+// ─── Label Pill Helper ────────────────────────────────────────────────────────
+// Takes a hex color and darkens it until white text is readable (brightness < 100).
+// Returns the resulting hex color for use as a pill background.
+function darkenUntilReadable(hex) {
+  const base = hex.replace('#', '').substring(0, 6);
+  let r = parseInt(base.substring(0, 2), 16);
+  let g = parseInt(base.substring(2, 4), 16);
+  let b = parseInt(base.substring(4, 6), 16);
+  const brightness = () => (r * 299 + g * 587 + b * 114) / 1000;
+  while (brightness() > 100) {
+    r = Math.max(0, Math.round(r * 0.8));
+    g = Math.max(0, Math.round(g * 0.8));
+    b = Math.max(0, Math.round(b * 0.8));
+  }
+  return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+}
+
 // ─── Class Distribution ───────────────────────────────────────────────────────
 async function loadClassDist() {
   const res = await fetch('/api/class_distribution');
   const data = await res.json();
 
+  // Per-class colors for the 1st Job segment
+  const FIRST_JOB_COLORS = {
+    'Warrior': '#aa1111', 'Magician': '#7722bb', 'Archer': '#00aa44',
+    'Thief': '#1144aa', 'Pirate': '#cc7700', 'Beginner': '#607375',
+  };
+
   // Branch colors per class
   const BRANCH_COLORS = {
-    // 1st job
-    '1st Job':      '#778899',
+    // 1st job uses per-class color (handled below)
+    '1st Job':      null,
     // Warrior branches
     'Fighter':      '#ff4444', 'Page':          '#cc44ff', 'Spearman':     '#ff44aa',
     // Magician branches
@@ -775,14 +798,19 @@ async function loadClassDist() {
   }
 
   // Build one dataset per branch
-  const datasets = allBranches.map(branch => ({
-    label: branch,
-    data: classLabels.map(cls => data[cls][branch] || 0),
-    backgroundColor: (BRANCH_COLORS[branch] || '#aaa') + 'bb',
-    hoverBackgroundColor: (BRANCH_COLORS[branch] || '#aaa') + 'ee',
-    borderColor: BRANCH_COLORS[branch] || '#aaa',
-    borderWidth: 1,
-  }));
+  const datasets = allBranches.map(branch => {
+    const getColor = cls => branch === '1st Job'
+      ? (FIRST_JOB_COLORS[cls] || '#778899')
+      : (BRANCH_COLORS[branch] || '#aaa');
+    return {
+      label: branch,
+      data: classLabels.map(cls => data[cls][branch] || 0),
+      backgroundColor: classLabels.map(cls => getColor(cls) + 'bb'),
+      hoverBackgroundColor: classLabels.map(cls => getColor(cls) + 'ee'),
+      borderColor: classLabels.map(cls => getColor(cls)),
+      borderWidth: 1,
+    };
+  });
 
   // Sum labels plugin
   const stackTotalPlugin = {
@@ -831,12 +859,20 @@ async function loadClassDist() {
           },
         },
         datalabels: {
-          display: ctx => ctx.dataset.data[ctx.dataIndex] > 0,
+          display: ctx => ctx.dataset.data[ctx.dataIndex] > 30,
           anchor: 'center',
           align: 'center',
-          color: '#0b0e1a',
-          font: { family: 'Share Tech Mono', size: 10, weight: 'bold' },
-          formatter: val => val > 30 ? val.toLocaleString() : '',
+          color: '#ffffff',
+          font: { family: 'Share Tech Mono', size: 10 },
+          formatter: val => val.toLocaleString(),
+          backgroundColor: ctx => {
+            const bg = Array.isArray(ctx.dataset.backgroundColor)
+              ? ctx.dataset.backgroundColor[ctx.dataIndex]
+              : ctx.dataset.backgroundColor;
+            return bg ? darkenUntilReadable(bg) : '#0b0e1a';
+          },
+          borderRadius: 3,
+          padding: { top: 2, bottom: 2, left: 4, right: 4 },
         },
       },
       scales: {

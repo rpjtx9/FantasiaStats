@@ -181,6 +181,20 @@ const JOB_COLORS = {
   520: '#00ffee', 521: '#0088ff', 522: '#cc00ff',
 };
 
+function darkenUntilReadable(hex) {
+  const base = hex.replace('#', '').substring(0, 6);
+  let r = parseInt(base.substring(0, 2), 16);
+  let g = parseInt(base.substring(2, 4), 16);
+  let b = parseInt(base.substring(4, 6), 16);
+  const brightness = () => (r * 299 + g * 587 + b * 114) / 1000;
+  while (brightness() > 100) {
+    r = Math.max(0, Math.round(r * 0.8));
+    g = Math.max(0, Math.round(g * 0.8));
+    b = Math.max(0, Math.round(b * 0.8));
+  }
+  return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+}
+
 const chartDefaults = {
   responsive: true,
   maintainAspectRatio: false,
@@ -341,11 +355,19 @@ function renderPopChart(jobData, filterClass) {
           },
         },
         datalabels: {
-          display: ctx => ctx.dataset.data[ctx.dataIndex] > 0,
+          display: ctx => ctx.dataset.data[ctx.dataIndex] > 20,
           anchor: 'center', align: 'center',
-          color: '#0b0e1a',
-          font: { family: 'Share Tech Mono', size: 10, weight: 'bold' },
-          formatter: val => val > 20 ? val.toLocaleString() : '',
+          color: '#ffffff',
+          font: { family: 'Share Tech Mono', size: 10 },
+          formatter: val => val.toLocaleString(),
+          backgroundColor: ctx => {
+            const bg = Array.isArray(ctx.dataset.backgroundColor)
+              ? ctx.dataset.backgroundColor[ctx.dataIndex]
+              : ctx.dataset.backgroundColor;
+            return bg ? darkenUntilReadable(bg) : '#0b0e1a';
+          },
+          borderRadius: 3,
+          padding: { top: 2, bottom: 2, left: 4, right: 4 },
         },
       },
       scales: {

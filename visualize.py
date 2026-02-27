@@ -60,31 +60,31 @@ CLASS_BRANCHES = {
 
 # Class accent colors - themed per class
 CLASS_COLORS = {
-    "Beginner": ["#95a5a6"],
+    "Beginner": ["#607375"],
     "Warrior": [
-        "#ff4444",                        # Warrior base - red
+        "#aa1111",                        # Warrior base - dark red
         "#ff4444", "#ff8800", "#ffcc00",  # Fighter branch - red to yellow
         "#cc44ff", "#8800ff", "#4400cc",  # Page branch - purples
         "#ff44aa", "#cc0055", "#880033",  # Spearman branch - pinks
     ],
     "Magician": [
-        "#bb44ff",                        # Magician base - purple
+        "#7722bb",                        # Magician base - dark purple
         "#ff6600", "#ff0000", "#880000",  # Fire/Poison branch - oranges/reds
         "#44aaff", "#0066ff", "#0033cc",  # Ice/Lightning branch - blues
         "#ffffff", "#cccccc", "#999999",  # Cleric branch - whites/greys
     ],
     "Archer": [
-        "#33ff77",                        # Archer base - green
+        "#00aa44",                        # Archer base - dark green
         "#33ff77", "#00cc44", "#008833",  # Hunter branch - bright greens
         "#ffff44", "#cccc00", "#888800",  # Crossbow branch - yellows
     ],
     "Thief": [
-        "#4488ff",                        # Thief base - blue
+        "#1144aa",                        # Thief base - dark blue
         "#4488ff", "#0044cc", "#002288",  # Assassin branch - blues
         "#ff8844", "#cc4400", "#882200",  # Bandit branch - oranges
     ],
     "Pirate": [
-        "#ffaa00",                        # Pirate base - gold
+        "#cc7700",                        # Pirate base - dark gold
         "#ffdd00", "#ff4400", "#880000",   # Brawler branch - gold, pink, purple
         "#00ffee", "#0088ff", "#cc00ff",  # Gunslinger branch - teal, blue, purple
     ],
