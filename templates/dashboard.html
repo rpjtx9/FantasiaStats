@@ -1152,7 +1152,7 @@ async function loadRetention() {
       <thead>
         <tr>
           <th>Cohort</th>
-          <th>New Players</th>
+          <th>New Active</th>
           ${d.week_labels.map(w => `<th>${w}</th>`).join('')}
         </tr>
       </thead>
@@ -1160,7 +1160,7 @@ async function loadRetention() {
         ${d.matrix.map((row, i) => `
           <tr>
             <td style="text-align:left;color:#e2e8f0;font-weight:600">${d.cohort_labels[i]}</td>
-            <td style="color:var(--accent)">${d.cohort_sizes[i]}</td>
+            <td style="color:var(--accent)">${d.new_active_players[i]}</td>
             ${row.map(val => val === null
               ? `<td class="hm-empty">—</td>`
               : `<td style="background:${cellColor(val)};color:${textColor(val)};font-weight:600">${val}%</td>`

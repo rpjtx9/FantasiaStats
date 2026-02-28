@@ -487,6 +487,13 @@ def api_retention():
 
     cohorts = {week: week_active_players(week) for week in weeks}
 
+    # New active players = active this week but never seen active in any prior week
+    seen_active = set()
+    new_active = {}
+    for week in weeks:
+        new_active[week] = len(cohorts[week] - seen_active)
+        seen_active.update(cohorts[week])
+
     retention_data = {}
     for cw, cp in cohorts.items():
         if not cp:
@@ -520,6 +527,7 @@ def api_retention():
         "week_labels": [f"Wk {i}" for i in range(max_weeks)],
         "matrix": matrix,
         "cohort_sizes": [len(cohorts[w]) for w in cohort_weeks],
+        "new_active_players": [new_active[w] for w in cohort_weeks],
     })
 
 @app.route("/api/player/<name>")
