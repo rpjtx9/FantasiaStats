@@ -456,31 +456,36 @@ def api_retention():
     cursor = conn.cursor()
     cursor.execute("SELECT id, timestamp FROM snapshots ORDER BY timestamp")
     snapshots = [dict(row) for row in cursor.fetchall()]
-
-    snapshot_players = {}
-    for s in snapshots:
-        cursor.execute("SELECT DISTINCT name FROM players WHERE snapshot_id = ?", (s["id"],))
-        snapshot_players[s["id"]] = set(row[0] for row in cursor.fetchall())
     conn.close()
 
     if len(snapshots) < 2:
         return jsonify({"error": "Not enough data"}), 400
 
     first_ts = datetime.strptime(snapshots[0]["timestamp"], TS_FMT)
+    now_ts   = datetime.strptime(snapshots[-1]["timestamp"], TS_FMT)
     for s in snapshots:
         ts = datetime.strptime(s["timestamp"], TS_FMT)
         s["week"] = (ts - first_ts).days // 7
 
+    # A week is "complete" if its last snapshot is at least 7 days after its first snapshot,
+    # or if it's not the current week (i.e. a newer week exists after it)
     weeks = sorted(set(s["week"] for s in snapshots))
-    cohorts, seen = {}, set()
-    for week in weeks:
-        week_snaps = [s for s in snapshots if s["week"] == week]
-        week_players = set()
-        for s in week_snaps:
-            week_players.update(snapshot_players[s["id"]])
-        new = week_players - seen
-        cohorts[week] = new
-        seen.update(new)
+    current_week = max(weeks)
+
+    def week_active_players(week):
+        snap_ids = [s["id"] for s in snapshots if s["week"] == week]
+        placeholders = ",".join("?" * len(snap_ids))
+        conn2 = get_connection()
+        cur2 = conn2.cursor()
+        cur2.execute(f"""
+            SELECT DISTINCT name FROM player_activity
+            WHERE snapshot_id IN ({placeholders}) AND exp_gained > 0
+        """, snap_ids)
+        result = set(r[0] for r in cur2.fetchall())
+        conn2.close()
+        return result
+
+    cohorts = {week: week_active_players(week) for week in weeks}
 
     retention_data = {}
     for cw, cp in cohorts.items():
@@ -490,10 +495,11 @@ def api_retention():
         for week in weeks:
             if week < cw:
                 continue
-            week_snaps = [s for s in snapshots if s["week"] == week]
-            wp = set()
-            for s in week_snaps:
-                wp.update(snapshot_players[s["id"]])
+            # Skip the current (incomplete) week as a retention target,
+            # except for offset 0 (the cohort's own week, always shown as 100%)
+            if week == current_week and week != cw:
+                continue
+            wp = week_active_players(week)
             pct = round(len(cp & wp) / len(cp) * 100, 1)
             retention_data[cw][week - cw] = pct
 
