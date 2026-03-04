@@ -6,7 +6,6 @@ Then open: http://localhost:5000
 """
 
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for
-import sqlite3
 from pathlib import Path
 from datetime import datetime, timedelta
 import os
@@ -17,18 +16,13 @@ from analyze import (
     FANTASIA_EXP_TABLE, calculate_exp_gained, exp_to_level_percent,
     get_class_for_job,
 )
+from database import get_connection
 
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24))
-DB_PATH = Path(os.environ.get("DATA_DIR", "data")) / "fantasia.db"
 
 TS_FMT = "%Y-%m-%d_%H-%M-%S"
-
-def get_connection():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
 
 def snapshot_closest_to(cursor, target_ts):
     """Return the snapshot nearest in time to target_ts (a datetime object)."""
@@ -110,15 +104,6 @@ def api_snapshot_range():
         "min": datetime.strptime(row[0], TS_FMT).strftime(fmt_out),
         "max": datetime.strptime(row[1], TS_FMT).strftime(fmt_out),
     })
-
-@app.route("/api/snapshots")
-def api_snapshots():
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, timestamp, total_players FROM snapshots ORDER BY id DESC LIMIT 50")
-    rows = [dict(row) for row in cursor.fetchall()]
-    conn.close()
-    return jsonify(rows)
 
 @app.route("/api/level_distribution")
 def api_level_distribution():
@@ -725,11 +710,7 @@ def api_guilds():
         """)
         names = [r[0] for r in cursor.fetchall()]
     except Exception:
-        try:
-            from guilds import GUILDS
-            names = list(GUILDS.keys())
-        except ImportError:
-            names = []
+        names = []
     conn.close()
     return jsonify(names)
 
@@ -747,21 +728,16 @@ def api_guild():
         cursor.execute("SELECT id, name FROM guilds ORDER BY name")
         guilds = {r[1]: r[0] for r in cursor.fetchall()}
         if not guilds:
-            raise Exception("empty")
+            conn.close()
+            return jsonify({"error": "No guilds configured"}), 404
         if not guild_name or guild_name not in guilds:
             guild_name = next(iter(guilds))
         guild_id = guilds[guild_name]
         cursor.execute("SELECT player_name FROM guild_members WHERE guild_id = ?", (guild_id,))
         MEMBERS = [r[0] for r in cursor.fetchall()]
     except Exception:
-        try:
-            from guilds import GUILDS
-        except ImportError:
-            conn.close()
-            return jsonify({"error": "No guilds configured"}), 404
-        if not guild_name or guild_name not in GUILDS:
-            guild_name = next(iter(GUILDS))
-        MEMBERS = GUILDS[guild_name]
+        conn.close()
+        return jsonify({"error": "No guilds configured"}), 404
     conn.close()
 
     if not MEMBERS:
