@@ -227,6 +227,85 @@ def api_activity():
         "new_players": [{"name": p["name"], "job_name": JOB_NAMES.get(p["job"], "?"), "level": p["level"], "class": get_class_for_job(p["job"])} for p in new_players[:10]],
     })
 
+@app.route("/activity/jobs")
+def activity_jobs_page():
+    return render_template("activity_jobs.html")
+
+@app.route("/api/active_class_distribution")
+def api_active_class_distribution():
+    """Branch-level breakdown of active players, mirroring /api/class_distribution."""
+    hours = request.args.get("hours", type=int)
+    start = request.args.get("start")
+    end   = request.args.get("end")
+    latest, prev = get_snapshot_window(hours=hours, start=start, end=end)
+    if not prev:
+        return jsonify({"error": "Need at least two snapshots"}), 400
+
+    latest_id = latest["id"]
+    prev_id = prev["id"]
+    latest_ts = latest["timestamp"]
+    prev_ts = prev["timestamp"]
+
+    delta = datetime.strptime(latest_ts, TS_FMT) - datetime.strptime(prev_ts, TS_FMT)
+    total_hours, remainder = divmod(int(delta.total_seconds()), 3600)
+    minutes = remainder // 60
+
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT pa.name, SUM(pa.exp_gained) as exp_gained, p.job, p.level
+        FROM player_activity pa
+        JOIN players p ON p.snapshot_id = ? AND p.name = pa.name
+        WHERE pa.snapshot_id IN (SELECT id FROM snapshots WHERE id > ? AND id <= ?)
+        GROUP BY pa.name
+        ORDER BY exp_gained DESC
+    """, (latest_id, prev_id, latest_id))
+    active = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+
+    CLASS_BRANCHES_DIST = {
+        "Warrior":  {"1st Job": [100], "Fighter": [110,111,112], "Page": [120,121,122], "Spearman": [130,131,132]},
+        "Magician": {"1st Job": [200], "Fire/Poison": [210,211,212], "Ice/Lightning": [220,221,222], "Cleric": [230,231,232]},
+        "Archer":   {"1st Job": [300], "Hunter": [310,311,312], "Crossbow": [320,321,322]},
+        "Thief":    {"1st Job": [400], "Assassin": [410,411,412], "Bandit": [420,421,422]},
+        "Pirate":   {"1st Job": [500], "Brawler": [510,511,512], "Gunslinger": [520,521,522]},
+        "Beginner": {"Beginner": [0]},
+    }
+
+    # Count active players per job
+    job_counts = {}
+    for p in active:
+        job_counts[p["job"]] = job_counts.get(p["job"], 0) + 1
+
+    # Branch-level counts (same shape as /api/class_distribution)
+    branch_counts = {}
+    for cls, branches in CLASS_BRANCHES_DIST.items():
+        branch_counts[cls] = {}
+        for branch_name, job_ids in branches.items():
+            branch_counts[cls][branch_name] = sum(job_counts.get(j, 0) for j in job_ids)
+
+    # Per-job counts and top players per job for the drilldown
+    job_details = {}
+    for p in active:
+        jid = p["job"]
+        if jid not in job_details:
+            job_details[jid] = {"count": 0, "players": []}
+        job_details[jid]["count"] += 1
+        if len(job_details[jid]["players"]) < 20:
+            job_details[jid]["players"].append({
+                "name": p["name"],
+                "level": p["level"],
+                "exp_gained": p["exp_gained"],
+                "job_name": JOB_NAMES.get(jid, "Unknown"),
+            })
+
+    return jsonify({
+        "window_label": f"{total_hours}h {minutes}m",
+        "branches": branch_counts,
+        "job_details": {str(k): v for k, v in job_details.items()},
+        "total_active": len(active),
+    })
+
 @app.route("/api/server_health")
 def api_server_health():
     conn = get_connection()

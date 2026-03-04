@@ -961,13 +961,25 @@ async function loadActiveDist() {
       responsive: true,
       maintainAspectRatio: false,
       layout: { padding: { top: 24 } },
+      onHover: (evt) => { evt.native.target.style.cursor = 'pointer'; },
+      onClick: (evt, elements) => {
+        if (elements.length > 0) {
+          const className = data.series[elements[0].datasetIndex]?.name;
+          const params = buildParams();
+          const classParam = className ? `class=${encodeURIComponent(className)}` : '';
+          window.location.href = `/activity/jobs?${classParam}${params.replace('?', '&')}`;
+        }
+      },
       plugins: {
         legend: {
           display: true,
           position: 'bottom',
           labels: { color: '#64748b', font: { family: 'Barlow', size: 14 }, boxWidth: 10, padding: 12 },
         },
-        tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: ${ctx.raw}` } },
+        tooltip: { callbacks: {
+          title: items => items.length ? `${items[0].dataset.label} — click to explore` : '',
+          label: ctx => ` ${ctx.dataset.label}: ${ctx.raw}`,
+        } },
         datalabels: { display: false },
       },
       scales: {
@@ -1011,9 +1023,20 @@ async function loadActivity() {
       borderRadius: 4,
     }],
   }, {
+    onHover: (evt) => { evt.native.target.style.cursor = 'pointer'; },
+    onClick: (evt, elements) => {
+      if (elements.length > 0) {
+        const label = classLabels[elements[0].index];
+        const params = buildParams();
+        window.location.href = `/activity/jobs?class=${encodeURIComponent(label)}${params.replace('?', '&')}`;
+      }
+    },
     plugins: {
       legend: { display: false },
-      tooltip: { callbacks: { label: ctx => ` ${ctx.raw} players` } },
+      tooltip: { callbacks: {
+        title: items => items.length ? `${items[0].label} — click to explore` : '',
+        label: ctx => ` ${ctx.raw} players`,
+      } },
       datalabels: {
         anchor: 'end',
         align: 'end',

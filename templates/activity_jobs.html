@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Active Players by Job — FantasiaStats.WIN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<style>
+:root {
+  --bg: #0b0e1a; --surface: #111827; --card: #141d2e; --border: #1e2d47;
+  --accent: #00d4ff; --accent2: #7c3aed; --green: #10b981; --yellow: #f59e0b;
+  --red: #ef4444; --text: #e2e8f0; --muted: #64748b;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'Barlow', sans-serif; min-height: 100vh; }
+body::before {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+}
+nav {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(11,14,26,0.92); backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 32px; display: flex; align-items: center; flex-wrap: wrap; min-height: 56px; gap: 8px 24px;
+}
+.nav-logo { font-family: 'Rajdhani',sans-serif; font-size: 20px; font-weight: 700; letter-spacing: 0.1em; color: var(--accent); text-transform: uppercase; }
+.nav-logo span { color: var(--text); }
+.nav-back { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; padding: 6px 12px; border-radius: 4px; transition: color 0.15s, background 0.15s; }
+.nav-back:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+
+main { max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
+
+.page-header { margin-bottom: 24px; }
+.page-title { font-family: 'Rajdhani',sans-serif; font-size: 28px; font-weight: 700; letter-spacing: 0.06em; }
+.page-subtitle { font-family: 'Share Tech Mono', monospace; font-size: 13px; color: var(--muted); margin-top: 4px; }
+
+.filter-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 28px; flex-wrap: wrap; }
+.filter-btn {
+  background: var(--card); border: 1px solid var(--border); color: var(--muted);
+  font-family: 'Share Tech Mono', monospace; font-size: 13px; padding: 6px 14px;
+  border-radius: 4px; cursor: pointer; transition: all 0.15s;
+}
+.filter-btn:hover { color: var(--text); border-color: var(--muted); }
+.filter-btn.active { color: var(--accent); border-color: var(--accent); background: rgba(0,212,255,0.08); }
+.filter-btn[data-class="Warrior"].active    { color: #ff4444; border-color: #ff4444; background: rgba(255,68,68,0.08); }
+.filter-btn[data-class="Magician"].active   { color: #bb44ff; border-color: #bb44ff; background: rgba(187,68,255,0.08); }
+.filter-btn[data-class="Archer"].active     { color: #33ff77; border-color: #33ff77; background: rgba(51,255,119,0.08); }
+.filter-btn[data-class="Thief"].active      { color: #4477ff; border-color: #4477ff; background: rgba(68,119,255,0.08); }
+.filter-btn[data-class="Pirate"].active     { color: #ffaa00; border-color: #ffaa00; background: rgba(255,170,0,0.08); }
+.filter-btn[data-class="Beginner"].active   { color: #95a5a6; border-color: #95a5a6; background: rgba(149,165,166,0.08); }
+.sort-btn {
+  background: var(--card); border: 1px solid var(--border); color: var(--muted);
+  font-family: 'Share Tech Mono', monospace; font-size: 13px; padding: 6px 14px;
+  border-radius: 4px; cursor: pointer; transition: all 0.15s;
+}
+.sort-btn:hover { color: var(--text); border-color: var(--muted); }
+.sort-btn.active { color: var(--accent); border-color: var(--accent); background: rgba(0,212,255,0.08); }
+.sort-menu-item { font-family: 'Share Tech Mono', monospace; font-size: 11px; color: var(--muted); padding: 8px 14px; cursor: pointer; }
+.sort-menu-item:hover { background: var(--surface); color: var(--text); }
+
+.card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 24px; }
+.card-title { font-family: 'Rajdhani', sans-serif; font-size: 16px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); margin-bottom: 16px; }
+
+.chart-wrap { position: relative; height: 360px; }
+
+.class-section { margin-bottom: 32px; }
+.class-header {
+  font-family: 'Rajdhani', sans-serif; font-size: 20px; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 12px;
+  padding-bottom: 8px; border-bottom: 1px solid var(--border);
+}
+.job-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+.job-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 6px;
+  padding: 12px 16px; display: flex; justify-content: space-between; align-items: center;
+  cursor: pointer; transition: border-color 0.15s;
+}
+.job-card:hover { border-color: var(--muted); }
+.job-name { font-size: 14px; color: var(--text); }
+.job-count { font-family: 'Share Tech Mono', monospace; font-size: 15px; }
+.job-pct { font-family: 'Share Tech Mono', monospace; font-size: 12px; color: var(--muted); margin-left: 6px; }
+
+.player-list { margin-top: 8px; }
+.player-row {
+  display: flex; align-items: center; gap: 12px; padding: 6px 12px;
+  cursor: pointer; transition: background 0.1s; border-radius: 4px;
+}
+.player-row:hover { background: rgba(255,255,255,0.04); }
+
+.loading { color: var(--muted); font-family: 'Share Tech Mono', monospace; font-size: 14px; padding: 40px; text-align: center; }
+.empty-state { color: var(--muted); font-family: 'Share Tech Mono', monospace; font-size: 13px; padding: 20px; text-align: center; }
+</style>
+</head>
+<body>
+<nav>
+  <a href="/" style="text-decoration:none;"><div class="nav-logo">FantasiaStats<span>.win</span></div></a>
+  <a href="/" class="nav-back">← Dashboard</a>
+</nav>
+
+<main>
+  <div class="page-header">
+    <div class="page-title">Active Players by Job</div>
+    <div class="page-subtitle" id="window-label">Loading...</div>
+  </div>
+
+  <div class="filter-bar">
+    <span style="font-size:13px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-right:4px;">Class:</span>
+    <button class="filter-btn active" data-class="All">All</button>
+    <button class="filter-btn" data-class="Warrior">Warrior</button>
+    <button class="filter-btn" data-class="Magician">Magician</button>
+    <button class="filter-btn" data-class="Archer">Archer</button>
+    <button class="filter-btn" data-class="Thief">Thief</button>
+    <button class="filter-btn" data-class="Pirate">Pirate</button>
+    <button class="filter-btn" data-class="Beginner">Beginner</button>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <div class="card-title" style="margin-bottom:0;">Active Players by Branch</div>
+      <div style="display:flex;gap:6px;position:relative;">
+        <button id="pop-sort-class" onclick="setPopSort('class')" class="sort-btn active" style="font-size:11px;padding:4px 10px;">CLASS ORDER</button>
+        <div style="position:relative;">
+          <button id="pop-sort-desc" onclick="toggleSortMenu()" class="sort-btn" style="font-size:11px;padding:4px 10px;">DESCENDING ▾</button>
+          <div id="sort-menu" style="display:none;position:absolute;right:0;top:calc(100% + 4px);background:var(--card);border:1px solid var(--border);border-radius:4px;z-index:50;min-width:130px;overflow:hidden;">
+            <div class="sort-menu-item" onclick="setPopSort('total')">By Total</div>
+            <div class="sort-menu-item" onclick="setPopSort('3rd')">By 3rd Job</div>
+            <div class="sort-menu-item" onclick="setPopSort('4th')">By 4th Job</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="chart-wrap"><canvas id="chart-branch-pop"></canvas></div>
+  </div>
+
+  <div id="breakdown-container" class="card">
+    <div class="card-title">Job Breakdown — Top Active Players</div>
+    <div id="breakdown-content"><div class="loading">Loading...</div></div>
+  </div>
+</main>
+
+<script>
+Chart.register(ChartDataLabels);
+
+const CLASS_COLORS = {
+  Beginner: '#95a5a6', Warrior: '#ff4444', Magician: '#bb44ff',
+  Archer: '#33ff77', Thief: '#4477ff', Pirate: '#ffaa00',
+};
+
+const JOB_COLORS = {
+  0:   '#95a5a6',
+  100: '#ff4444', 110: '#ff4444', 111: '#ff8800', 112: '#ffcc00',
+  120: '#cc44ff', 121: '#8800ff', 122: '#4400cc',
+  130: '#ff44aa', 131: '#cc0055', 132: '#880033',
+  200: '#bb44ff', 210: '#ff6600', 211: '#ff0000', 212: '#880000',
+  220: '#44aaff', 221: '#0066ff', 222: '#0033cc',
+  230: '#ffffff', 231: '#cccccc', 232: '#999999',
+  300: '#33ff77', 310: '#33ff77', 311: '#00cc44', 312: '#008833',
+  320: '#ffff44', 321: '#cccc00', 322: '#888800',
+  400: '#4488ff', 410: '#4488ff', 411: '#0044cc', 412: '#002288',
+  420: '#ff8844', 421: '#cc4400', 422: '#882200',
+  500: '#ffaa00', 510: '#ffdd00', 511: '#ff4400', 512: '#880000',
+  520: '#00ffee', 521: '#0088ff', 522: '#cc00ff',
+};
+
+const JOB_NAMES = {
+  0:'Beginner',100:'Warrior',110:'Fighter',111:'Crusader',112:'Hero',
+  120:'Page',121:'White Knight',122:'Paladin',130:'Spearman',131:'Dragon Knight',132:'Dark Knight',
+  200:'Magician',210:'Wizard (F/P)',211:'Mage (F/P)',212:'Archmage (F/P)',
+  220:'Wizard (I/L)',221:'Mage (I/L)',222:'Archmage (I/L)',
+  230:'Cleric',231:'Priest',232:'Bishop',300:'Archer',
+  310:'Hunter',311:'Ranger',312:'Bowmaster',320:'Crossbowman',321:'Sniper',322:'Marksman',
+  400:'Thief',410:'Assassin',411:'Hermit',412:'Night Lord',
+  420:'Bandit',421:'Chief Bandit',422:'Shadower',500:'Pirate',
+  510:'Brawler',511:'Marauder',512:'Buccaneer',520:'Gunslinger',521:'Outlaw',522:'Corsair',
+};
+
+const CLASS_BRANCHES = {
+  Warrior:  { Fighter: [110,111,112], Page: [120,121,122], Spearman: [130,131,132] },
+  Magician: { 'Fire/Poison': [210,211,212], 'Ice/Lightning': [220,221,222], Cleric: [230,231,232] },
+  Archer:   { Hunter: [310,311,312], Crossbow: [320,321,322] },
+  Thief:    { Assassin: [410,411,412], Bandit: [420,421,422] },
+  Pirate:   { Brawler: [510,511,512], Gunslinger: [520,521,522] },
+  Beginner: { Beginner: [0] },
+};
+
+const TIER_3RD = [111,121,131,211,221,231,311,321,411,421,511,521];
+const TIER_4TH = [112,122,132,212,222,232,312,322,412,422,512,522];
+
+function darkenUntilReadable(hex) {
+  const base = hex.replace('#', '').substring(0, 6);
+  let r = parseInt(base.substring(0, 2), 16);
+  let g = parseInt(base.substring(2, 4), 16);
+  let b = parseInt(base.substring(4, 6), 16);
+  const brightness = () => (r * 299 + g * 587 + b * 114) / 1000;
+  while (brightness() > 100) {
+    r = Math.max(0, Math.round(r * 0.8));
+    g = Math.max(0, Math.round(g * 0.8));
+    b = Math.max(0, Math.round(b * 0.8));
+  }
+  return '#' + [r, g, b].map(v => v.toString(16).padStart(2, '0')).join('');
+}
+
+let chart = null;
+let apiData = null;
+let currentClass = 'All';
+let popSortMode = 'class';
+
+function getParams() {
+  const url = new URLSearchParams(window.location.search);
+  const params = new URLSearchParams();
+  if (url.get('hours')) params.set('hours', url.get('hours'));
+  if (url.get('start')) params.set('start', url.get('start'));
+  if (url.get('end')) params.set('end', url.get('end'));
+  const str = params.toString();
+  return str ? '?' + str : '';
+}
+
+function toggleSortMenu() {
+  const menu = document.getElementById('sort-menu');
+  menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+
+function setPopSort(mode) {
+  popSortMode = mode;
+  document.getElementById('sort-menu').style.display = 'none';
+  const isClass = mode === 'class';
+  document.getElementById('pop-sort-class').classList.toggle('active', isClass);
+  document.getElementById('pop-sort-desc').classList.toggle('active', !isClass);
+  if (apiData) renderChart(apiData, currentClass);
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('#pop-sort-desc') && !e.target.closest('#sort-menu')) {
+    const menu = document.getElementById('sort-menu');
+    if (menu) menu.style.display = 'none';
+  }
+});
+
+function renderChart(data, filterClass) {
+  if (chart) { chart.destroy(); chart = null; }
+
+  const CLASS_ORDER = ['Warrior', 'Magician', 'Archer', 'Thief', 'Pirate', 'Beginner'];
+  const classes = filterClass === 'All' ? CLASS_ORDER : [filterClass];
+
+  // Build branch rows with per-job counts
+  const branchRows = [];
+  for (const cls of classes) {
+    const branches = CLASS_BRANCHES[cls] || {};
+    for (const [branchName, jobIds] of Object.entries(branches)) {
+      const total = jobIds.reduce((s, id) => s + (data.job_details[id]?.count || 0), 0);
+      if (total > 0 || filterClass !== 'All') {
+        branchRows.push({ branchName, cls, jobIds, total });
+      }
+    }
+  }
+
+  // Sort within each class by total descending for class order mode
+  if (popSortMode === 'class') {
+    // Already in class order from the loop above; sort branches within each class
+    const classGroups = {};
+    for (const b of branchRows) {
+      if (!classGroups[b.cls]) classGroups[b.cls] = [];
+      classGroups[b.cls].push(b);
+    }
+    branchRows.length = 0;
+    for (const cls of classes) {
+      const group = classGroups[cls] || [];
+      group.sort((a, b) => b.total - a.total);
+      branchRows.push(...group);
+    }
+  } else {
+    branchRows.sort((a, b) => {
+      if (popSortMode === '3rd') {
+        const aVal = a.jobIds.filter(id => TIER_3RD.includes(id)).reduce((s, id) => s + (data.job_details[id]?.count || 0), 0);
+        const bVal = b.jobIds.filter(id => TIER_3RD.includes(id)).reduce((s, id) => s + (data.job_details[id]?.count || 0), 0);
+        return bVal - aVal;
+      }
+      if (popSortMode === '4th') {
+        const aVal = a.jobIds.filter(id => TIER_4TH.includes(id)).reduce((s, id) => s + (data.job_details[id]?.count || 0), 0);
+        const bVal = b.jobIds.filter(id => TIER_4TH.includes(id)).reduce((s, id) => s + (data.job_details[id]?.count || 0), 0);
+        return bVal - aVal;
+      }
+      return b.total - a.total;
+    });
+  }
+
+  if (!branchRows.length) {
+    const wrap = document.getElementById('chart-branch-pop').parentElement;
+    wrap.innerHTML = '<div class="empty-state">No active players in this class</div>';
+    return;
+  }
+
+  const branchLabels = branchRows.map(b => b.branchName);
+
+  // One dataset per individual job (stacked segments like jobs.html)
+  const allJobIds = [...new Set(branchRows.flatMap(b => b.jobIds))];
+  const datasets = allJobIds.map(jobId => {
+    const color = JOB_COLORS[jobId] || '#aaa';
+    return {
+      label: JOB_NAMES[jobId] || String(jobId),
+      _jobId: jobId,
+      data: branchRows.map(b => b.jobIds.includes(jobId) ? (data.job_details[jobId]?.count || 0) : 0),
+      backgroundColor: color + 'bb',
+      hoverBackgroundColor: color + 'ee',
+      borderColor: color,
+      borderWidth: 1,
+    };
+  });
+
+  // Total label plugin
+  const stackTotalPlugin = {
+    id: 'branchTotals',
+    afterDatasetsDraw(chart) {
+      const { ctx, scales: { x, y } } = chart;
+      branchRows.forEach((b, i) => {
+        const yPos = y.getPixelForValue(i);
+        const xPos = x.getPixelForValue(b.total);
+        ctx.save();
+        ctx.font = '11px "Share Tech Mono"';
+        ctx.fillStyle = '#e2e8f0';
+        ctx.textAlign = 'left';
+        ctx.fillText(b.total.toLocaleString(), xPos + 6, yPos + 4);
+        ctx.restore();
+      });
+    },
+  };
+
+  const ctx = document.getElementById('chart-branch-pop');
+  chart = new Chart(ctx, {
+    type: 'bar',
+    plugins: [stackTotalPlugin, ChartDataLabels],
+    data: { labels: branchLabels, datasets },
+    options: {
+      indexAxis: 'y',
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          mode: 'index',
+          intersect: true,
+          callbacks: {
+            title: items => items.length ? items[0].label : '',
+            label: ctx => ctx.raw > 0 ? ` ${ctx.dataset.label}: ${ctx.raw.toLocaleString()}` : null,
+          },
+        },
+        datalabels: {
+          display: ctx => ctx.dataset.data[ctx.dataIndex] > 10,
+          anchor: 'center', align: 'center',
+          color: '#ffffff',
+          font: { family: 'Share Tech Mono', size: 10 },
+          formatter: val => val.toLocaleString(),
+          backgroundColor: ctx => {
+            const bg = Array.isArray(ctx.dataset.backgroundColor)
+              ? ctx.dataset.backgroundColor[ctx.dataIndex]
+              : ctx.dataset.backgroundColor;
+            return bg ? darkenUntilReadable(bg) : '#0b0e1a';
+          },
+          borderRadius: 3,
+          padding: { top: 2, bottom: 2, left: 4, right: 4 },
+        },
+      },
+      scales: {
+        x: {
+          stacked: true, grace: '15%',
+          ticks: { color: '#64748b', font: { family: 'Share Tech Mono', size: 12 } },
+          grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' },
+        },
+        y: {
+          stacked: true,
+          ticks: { color: '#e2e8f0', font: { family: 'Barlow', size: 13, weight: '500' } },
+          grid: { color: 'rgba(255,255,255,0.04)' }, border: { color: '#1e2d47' },
+        },
+      },
+      onHover: (e, elements) => { e.native.target.style.cursor = elements.length ? 'pointer' : 'default'; },
+      onClick: (e, elements) => {
+        if (!elements.length) return;
+        const ds = chart.data.datasets[elements[0].datasetIndex];
+        const jobId = ds._jobId;
+        if (jobId !== undefined) openJobDetail(jobId, ds.label);
+      },
+    },
+  });
+}
+
+function renderBreakdown(data, filterClass) {
+  const container = document.getElementById('breakdown-content');
+  const CLASS_ORDER = ['Warrior', 'Magician', 'Archer', 'Thief', 'Pirate', 'Beginner'];
+  const classes = filterClass === 'All' ? CLASS_ORDER : [filterClass];
+
+  let html = '';
+  for (const cls of classes) {
+    const branches = CLASS_BRANCHES[cls] || {};
+    const classTotal = Object.values(data.branches[cls] || {}).reduce((s, v) => s + v, 0);
+    if (classTotal === 0 && filterClass === 'All') continue;
+    const color = CLASS_COLORS[cls] || '#aaa';
+
+    html += `<div class="class-section">
+      <div class="class-header" style="color:${color}">
+        ${cls} <span style="color:var(--muted);font-size:14px;font-weight:400">${classTotal} active (${data.total_active > 0 ? ((classTotal/data.total_active)*100).toFixed(1) : 0}%)</span>
+      </div>
+      <div class="job-grid">`;
+
+    // Show each individual job, sorted by count descending
+    const jobs = [];
+    for (const [branchName, jobIds] of Object.entries(branches)) {
+      for (const jobId of jobIds) {
+        const count = data.job_details[jobId]?.count || 0;
+        jobs.push({ jobId, count, branchName });
+      }
+    }
+    jobs.sort((a, b) => b.count - a.count);
+
+    for (const j of jobs) {
+      const jColor = JOB_COLORS[j.jobId] || color;
+      html += `<div class="job-card" onclick="toggleJobPlayers(this, ${j.jobId})" style="border-left: 3px solid ${jColor}">
+        <span class="job-name">${JOB_NAMES[j.jobId] || 'Unknown'}</span>
+        <span>
+          <span class="job-count" style="color:${jColor}">${j.count}</span>
+          <span class="job-pct">${data.total_active > 0 ? ((j.count/data.total_active)*100).toFixed(1) : 0}%</span>
+        </span>
+      </div>`;
+    }
+
+    html += '</div></div>';
+  }
+
+  container.innerHTML = html || '<div class="empty-state">No active players in this class</div>';
+}
+
+function openJobDetail(jobId, jobName) {
+  const detail = apiData.job_details[jobId];
+  if (!detail || !detail.players.length) return;
+
+  // Scroll to breakdown and expand that job
+  const card = document.querySelector(`.job-card[onclick*="${jobId}"]`);
+  if (card) {
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Auto-expand if not already
+    const existing = card.parentElement.parentElement.querySelector(`.player-list[data-job="${jobId}"]`);
+    if (!existing) toggleJobPlayers(card, jobId);
+  }
+}
+
+function toggleJobPlayers(card, jobId) {
+  const section = card.closest('.class-section');
+  const existing = section.querySelector(`.player-list[data-job="${jobId}"]`);
+  if (existing) { existing.remove(); return; }
+
+  const detail = apiData.job_details[jobId];
+  if (!detail || !detail.players.length) return;
+
+  const list = document.createElement('div');
+  list.className = 'player-list';
+  list.dataset.job = jobId;
+  list.style.gridColumn = '1 / -1';
+
+  list.innerHTML = detail.players.map((p, i) => `
+    <div class="player-row" onclick="window.location.href='/player/${encodeURIComponent(p.name)}'">
+      <div style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--muted);width:24px;text-align:right;">${i+1}.</div>
+      <div style="flex:1;">
+        <span style="font-size:14px;font-weight:600;">${p.name}</span>
+        <span style="font-size:12px;color:var(--muted);margin-left:8px;">Lv.${p.level}</span>
+      </div>
+      <div style="font-family:'Share Tech Mono',monospace;font-size:12px;color:var(--green);">+${p.exp_gained.toLocaleString()}</div>
+    </div>
+  `).join('');
+
+  // Insert after the job grid
+  card.closest('.job-grid').after(list);
+}
+
+async function loadData() {
+  const res = await fetch('/api/active_class_distribution' + getParams());
+  if (!res.ok) {
+    document.getElementById('breakdown-content').innerHTML = '<div class="empty-state">Need at least two snapshots</div>';
+    return;
+  }
+  apiData = await res.json();
+
+  document.getElementById('window-label').textContent =
+    `${apiData.total_active.toLocaleString()} active players — ${apiData.window_label} window`;
+
+  renderChart(apiData, currentClass);
+  renderBreakdown(apiData, currentClass);
+}
+
+// ─── Filter buttons ──────────────────────────────────────────────────────────
+document.querySelectorAll('.filter-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.filter-btn[data-class]').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentClass = btn.dataset.class;
+    renderChart(apiData, currentClass);
+    renderBreakdown(apiData, currentClass);
+  });
+});
+
+// ─── Read class from URL param ───────────────────────────────────────────────
+const urlClass = new URLSearchParams(window.location.search).get('class');
+if (urlClass) {
+  currentClass = urlClass;
+  const btn = document.querySelector(`.filter-btn[data-class="${urlClass}"]`);
+  if (btn) {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  }
+}
+
+setPopSort('class');
+loadData();
+</script>
+</body>
+</html>
