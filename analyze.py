@@ -1,7 +1,14 @@
+"""
+Fantasia game constants, lookup tables, and shared analysis utilities.
+This module is the single source of truth — all other modules import from here.
+"""
+
 import json
 from collections import Counter
 from pathlib import Path
 
+
+# ─── Job Definitions ─────────────────────────────────────────────────────────
 
 JOB_NAMES = {
     0: "Beginner",
@@ -10,8 +17,8 @@ JOB_NAMES = {
     120: "Page", 121: "White Knight", 122: "Paladin",
     130: "Spearman", 131: "Dragon Knight", 132: "Dark Knight",
     200: "Magician",
-    210: "Wizard (Fire/Poison)", 211: "Mage (Fire/Poison)", 212: "Archmage (Fire/Poison)",
-    220: "Wizard (Ice/Lightning)", 221: "Mage (Ice/Lightning)", 222: "Archmage (Ice/Lightning)",
+    210: "Wizard (F/P)", 211: "Mage (F/P)", 212: "Archmage (F/P)",
+    220: "Wizard (I/L)", 221: "Mage (I/L)", 222: "Archmage (I/L)",
     230: "Cleric", 231: "Priest", 232: "Bishop",
     300: "Archer",
     310: "Hunter", 311: "Ranger", 312: "Bowmaster",
@@ -47,6 +54,36 @@ JOB_LEVEL_FLOORS = {
     412: 120, 422: 120,
     512: 120, 522: 120,
 }
+
+CLASS_JOB_IDS = {
+    "Beginner": [0],
+    "Warrior":  [100, 110, 111, 112, 120, 121, 122, 130, 131, 132],
+    "Magician": [200, 210, 211, 212, 220, 221, 222, 230, 231, 232],
+    "Archer":   [300, 310, 311, 312, 320, 321, 322],
+    "Thief":    [400, 410, 411, 412, 420, 421, 422],
+    "Pirate":   [500, 510, 511, 512, 520, 521, 522],
+}
+
+TIER_JOB_IDS = {
+    "Beginner": [0],
+    "1st Job": [100, 200, 300, 400, 500],
+    "2nd Job": [110, 120, 130, 210, 220, 230, 310, 320, 410, 420, 510, 520],
+    "3rd Job": [111, 121, 131, 211, 221, 231, 311, 321, 411, 421, 511, 521],
+    "4th Job": [112, 122, 132, 212, 222, 232, 312, 322, 412, 422, 512, 522],
+}
+
+# Reverse lookup: job_id -> class name
+_JOB_TO_CLASS = {}
+for _cls, _ids in CLASS_JOB_IDS.items():
+    for _jid in _ids:
+        _JOB_TO_CLASS[_jid] = _cls
+
+def get_class_for_job(job_id):
+    """Return the class name (Warrior, Magician, etc.) for a given job_id."""
+    return _JOB_TO_CLASS.get(job_id, "Beginner")
+
+
+# ─── Exp Table ───────────────────────────────────────────────────────────────
 
 FANTASIA_EXP_TABLE = {
     1: 15, 2: 34, 3: 57, 4: 92, 5: 135, 6: 372, 7: 560, 8: 840, 9: 1242, 10: 1716,
@@ -86,6 +123,34 @@ FANTASIA_EXP_TABLE = {
 }
 
 
+# ─── Exp Calculation Utilities ───────────────────────────────────────────────
+
+def calculate_exp_gained(current, previous):
+    """Calculate true exp gained between two snapshots, accounting for level-ups."""
+    exp_diff = current["experience"] - previous["experience"]
+    if current["level"] > previous["level"]:
+        levels_gained = current["level"] - previous["level"]
+        true_gain = 0
+        for lvl_offset in range(levels_gained):
+            lvl = previous["level"] + lvl_offset
+            if lvl_offset == 0:
+                true_gain += FANTASIA_EXP_TABLE.get(lvl, 0) - previous["experience"]
+            else:
+                true_gain += FANTASIA_EXP_TABLE.get(lvl, 0)
+        true_gain += current["experience"]
+        return true_gain
+    return exp_diff
+
+def exp_to_level_percent(exp_gained, current_level):
+    """Convert raw exp gained to percentage of a level at current_level."""
+    if current_level < 1 or current_level > 200:
+        return 0.0
+    level_exp = FANTASIA_EXP_TABLE.get(current_level, 1)
+    return round((exp_gained / level_exp) * 100, 1)
+
+
+# ─── Snapshot Analysis (used by CLI / main.py) ──────────────────────────────
+
 def level_distribution(players, bucket_size=10):
     buckets = Counter()
     for player in players:
@@ -103,10 +168,10 @@ def job_popularity(players):
 
 def active_players(snapshot_today, snapshot_yesterday, exp_threshold=0):
     yesterday_by_name = {p["name"]: p for p in snapshot_yesterday}
-    
+
     active = []
     new_players = []
-    
+
     for player in snapshot_today:
         name = player["name"]
         if name in yesterday_by_name:
@@ -118,7 +183,7 @@ def active_players(snapshot_today, snapshot_yesterday, exp_threshold=0):
                 })
         else:
             new_players.append(player)
-    
+
     return {
         "active_count": len(active),
         "new_players_count": len(new_players),
@@ -137,69 +202,48 @@ def summary(players):
 
 def level_distribution_by_class(players, bucket_size=10):
     class_buckets = {}
-    
+
     for player in players:
         job_name = JOB_NAMES.get(player["job"], f"Unknown ({player['job']})")
-        
+
         floor = JOB_LEVEL_FLOORS.get(player["job"], 1)
         if player["level"] < floor:
             continue
-        
+
         if player["level"] == floor:
             label = str(floor)
         else:
             bucket = ((player["level"] - floor - 1) // bucket_size) * bucket_size + floor + 1
             label = f"{bucket}-{bucket + bucket_size - 1}"
-        
+
         if job_name not in class_buckets:
             class_buckets[job_name] = {}
-        
+
         class_buckets[job_name][label] = class_buckets[job_name].get(label, 0) + 1
-    
+
     for job_name in class_buckets:
         class_buckets[job_name] = dict(sorted(class_buckets[job_name].items(), key=lambda x: int(x[0].split("-")[0])))
-    
+
     return class_buckets
 
 def level_distribution_by_class_grouped(players, bucket_size=10):
     flat = level_distribution_by_class(players, bucket_size)
-    
+
     grouped = {}
     current_group = None
-    
+
     # Add Beginner first
     if "Beginner" in flat:
         grouped["Beginner"] = {"Beginner": flat["Beginner"]}
-    
+
     for job_id in sorted(JOB_NAMES.keys()):
         job_name = JOB_NAMES[job_id]
-        
+
         if job_id % 100 == 0 and job_id != 0:
             current_group = job_name
             grouped[current_group] = {}
-        
+
         if current_group and job_name in flat:
             grouped[current_group][job_name] = flat[job_name]
-    
-    return grouped
 
-def calculate_exp_gained(current, previous):
-    exp_diff = current["experience"] - previous["experience"]
-    if current["level"] > previous["level"]:
-        levels_gained = current["level"] - previous["level"]
-        true_gain = 0
-        for lvl_offset in range(levels_gained):
-            lvl = previous["level"] + lvl_offset
-            if lvl_offset == 0:
-                true_gain += FANTASIA_EXP_TABLE.get(lvl, 0) - previous["experience"]
-            else:
-                true_gain += FANTASIA_EXP_TABLE.get(lvl, 0)
-        true_gain += current["experience"]
-        return true_gain
-    return exp_diff
-def exp_to_level_percent(exp_gained, current_level):
-    """Convert raw exp gained to percentage of a level at current_level"""
-    if current_level < 1 or current_level > 200:
-        return 0.0
-    level_exp = FANTASIA_EXP_TABLE.get(current_level, 1)
-    return round((exp_gained / level_exp) * 100, 1)
+    return grouped
