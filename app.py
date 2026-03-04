@@ -820,11 +820,12 @@ def api_jobs_level_distribution():
 
 @app.route("/api/guilds")
 def api_guilds():
-    try:
-        from guilds import GUILDS
-        return jsonify(list(GUILDS.keys()))
-    except ImportError:
-        return jsonify([])
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT name FROM guilds ORDER BY name")
+    names = [r[0] for r in cursor.fetchall()]
+    conn.close()
+    return jsonify(names)
 
 @app.route("/api/guild")
 def api_guild():
@@ -833,15 +834,26 @@ def api_guild():
     end        = request.args.get("end")
     guild_name = request.args.get("guild", "")
 
-    try:
-        from guilds import GUILDS
-    except ImportError:
-        return jsonify({"error": "guilds.py not found"}), 404
+    conn = get_connection()
+    cursor = conn.cursor()
 
-    if not guild_name or guild_name not in GUILDS:
-        guild_name = next(iter(GUILDS))
+    cursor.execute("SELECT id, name FROM guilds ORDER BY name")
+    guilds = {r[1]: r[0] for r in cursor.fetchall()}
 
-    MEMBERS = GUILDS[guild_name]
+    if not guilds:
+        conn.close()
+        return jsonify({"error": "No guilds configured"}), 404
+
+    if not guild_name or guild_name not in guilds:
+        guild_name = next(iter(guilds))
+
+    guild_id = guilds[guild_name]
+    cursor.execute("SELECT player_name FROM guild_members WHERE guild_id = ?", (guild_id,))
+    MEMBERS = [r[0] for r in cursor.fetchall()]
+    conn.close()
+
+    if not MEMBERS:
+        return jsonify({"error": "Guild has no members"}), 404
 
     latest, prev = get_snapshot_window(hours=hours, start=start, end=end)
     if not prev:

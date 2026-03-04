@@ -862,9 +862,24 @@ def plot_retention():
         print(f"Saved: {path}")
     
 def plot_guild_card(hours=None):
-    from guilds import GUILDS
     GUILD_NAME = "Classic"
-    MEMBERS = GUILDS[GUILD_NAME]
+
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT id FROM guilds WHERE name = ?", (GUILD_NAME,))
+    guild_row = cursor.fetchone()
+    if not guild_row:
+        print(f"Guild '{GUILD_NAME}' not found in database.")
+        conn.close()
+        return
+    guild_id = guild_row[0]
+    cursor.execute("SELECT player_name FROM guild_members WHERE guild_id = ?", (guild_id,))
+    MEMBERS = [r[0] for r in cursor.fetchall()]
+    if not MEMBERS:
+        print(f"Guild '{GUILD_NAME}' has no members.")
+        conn.close()
+        return
 
     conn = get_connection()
     cursor = conn.cursor()
