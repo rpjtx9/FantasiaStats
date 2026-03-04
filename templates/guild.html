@@ -71,6 +71,12 @@ main { max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
 <nav>
   <a href="/" style="text-decoration:none;"><div class="nav-logo">FantasiaStats<span>.win</span></div></a>
   <a href="/" class="nav-back">← Dashboard</a>
+  {% if session_guild_name %}
+  <a href="/guild/roster" class="nav-back" style="color:var(--green);border:1px solid var(--border);font-size:12px;padding:4px 10px;">Manage {{ session_guild_name }} Roster</a>
+  <a href="/guild/logout" class="nav-back" style="font-size:11px;padding:4px 8px;">Logout</a>
+  {% else %}
+  <a href="/guild/login" class="nav-back" style="font-size:11px;padding:4px 8px;">Guild Leader Login</a>
+  {% endif %}
   <div style="display:flex;align-items:center;gap:8px;margin-left:16px;">
     <span style="font-size:14px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;">Guild:</span>
     <select id="guild-select" style="background:var(--card);border:1px solid var(--border);color:var(--text);font-family:'Barlow',sans-serif;font-size:14px;padding:5px 10px;border-radius:4px;cursor:pointer;outline:none;">
