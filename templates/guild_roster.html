@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ guild_name }} Roster — FantasiaStats.WIN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0b0e1a; --surface: #111827; --card: #141d2e; --border: #1e2d47;
+  --accent: #00d4ff; --green: #10b981; --red: #ef4444; --yellow: #f59e0b;
+  --text: #e2e8f0; --muted: #64748b;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--bg); color: var(--text); font-family: 'Barlow', sans-serif; min-height: 100vh; }
+body::before {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+}
+nav {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(11,14,26,0.92); backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 32px; display: flex; align-items: center; gap: 24px; min-height: 56px;
+}
+.nav-logo { font-family: 'Rajdhani',sans-serif; font-size: 20px; font-weight: 700; letter-spacing: 0.1em; color: var(--accent); text-transform: uppercase; text-decoration: none; }
+.nav-logo span { color: var(--text); }
+.nav-back { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; padding: 6px 12px; border-radius: 4px; transition: color 0.15s, background 0.15s; }
+.nav-back:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+.nav-logout { margin-left: auto; color: var(--muted); text-decoration: none; font-family: 'Share Tech Mono', monospace; font-size: 12px; letter-spacing: 0.06em; padding: 6px 12px; border: 1px solid var(--border); border-radius: 4px; transition: all 0.15s; }
+.nav-logout:hover { color: var(--red); border-color: var(--red); }
+
+main { max-width: 900px; margin: 0 auto; padding: 32px 24px; }
+.page-header { margin-bottom: 28px; }
+.page-title { font-family: 'Rajdhani', sans-serif; font-size: 32px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.page-title span { color: var(--accent); }
+.page-sub { font-family: 'Share Tech Mono', monospace; font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+@media (max-width: 700px) { .grid { grid-template-columns: 1fr; } }
+
+.card {
+  background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+  padding: 22px; position: relative; overflow: hidden;
+}
+.card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent); opacity: 0.3;
+}
+.card-title {
+  font-family: 'Rajdhani', sans-serif; font-size: 16px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted);
+  margin-bottom: 16px;
+}
+
+/* Add member */
+.add-wrap { display: flex; gap: 8px; position: relative; }
+.add-input {
+  flex: 1; background: var(--surface); border: 1px solid var(--border);
+  color: var(--text); font-family: 'Barlow', sans-serif; font-size: 15px;
+  padding: 9px 12px; border-radius: 5px; outline: none; transition: border-color 0.15s;
+}
+.add-input:focus { border-color: var(--accent); }
+.btn {
+  font-family: 'Rajdhani', sans-serif; font-size: 14px; font-weight: 700;
+  letter-spacing: 0.08em; text-transform: uppercase; border: none; border-radius: 5px;
+  padding: 9px 16px; cursor: pointer; transition: opacity 0.15s, transform 0.1s; white-space: nowrap;
+}
+.btn:active { transform: scale(0.97); }
+.btn-add  { background: var(--green); color: #0b0e1a; }
+.btn-add:hover { opacity: 0.85; }
+.btn-danger { background: transparent; border: 1px solid var(--border); color: var(--muted); padding: 4px 10px; font-size: 12px; }
+.btn-danger:hover { border-color: var(--red); color: var(--red); }
+.btn-save { background: var(--accent); color: #0b0e1a; }
+.btn-save:hover { opacity: 0.85; }
+
+/* Autocomplete */
+.autocomplete-list {
+  position: absolute; top: calc(100% + 4px); left: 0; right: 52px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 5px;
+  max-height: 200px; overflow-y: auto; z-index: 50; display: none;
+}
+.autocomplete-list.open { display: block; }
+.ac-item {
+  padding: 8px 12px; font-size: 14px; cursor: pointer; transition: background 0.1s;
+}
+.ac-item:hover, .ac-item.highlighted { background: rgba(0,212,255,0.08); color: var(--accent); }
+
+/* Member list */
+.member-list { margin-top: 4px; max-height: 420px; overflow-y: auto; }
+.member-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 4px; border-bottom: 1px solid rgba(255,255,255,0.03);
+  transition: background 0.1s;
+}
+.member-row:last-child { border-bottom: none; }
+.member-row:hover { background: rgba(255,255,255,0.02); }
+.member-name { font-size: 15px; font-weight: 500; }
+.member-count {
+  font-family: 'Share Tech Mono', monospace; font-size: 12px; color: var(--muted);
+  margin-bottom: 12px;
+}
+
+/* Password */
+.pw-field { margin-bottom: 14px; }
+.pw-label {
+  display: block; font-family: 'Share Tech Mono', monospace; font-size: 11px;
+  color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 7px;
+}
+.pw-input {
+  width: 100%; background: var(--surface); border: 1px solid var(--border);
+  color: var(--text); font-family: 'Barlow', sans-serif; font-size: 15px;
+  padding: 9px 12px; border-radius: 5px; outline: none; transition: border-color 0.15s;
+}
+.pw-input:focus { border-color: var(--accent); }
+.pw-note {
+  font-family: 'Share Tech Mono', monospace; font-size: 11px; color: var(--muted);
+  margin-top: 10px;
+}
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 24px; right: 24px; z-index: 1000;
+  background: var(--card); border: 1px solid var(--border); border-radius: 6px;
+  padding: 12px 18px; font-family: 'Share Tech Mono', monospace; font-size: 13px;
+  opacity: 0; transform: translateY(8px); transition: all 0.2s; pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast.success { border-color: var(--green); color: var(--green); }
+.toast.error   { border-color: var(--red);   color: var(--red); }
+</style>
+</head>
+<body>
+<nav>
+  <a href="/" class="nav-logo">FantasiaStats<span>.win</span></a>
+  <a href="/guild" class="nav-back">← Guild</a>
+  <a href="/guild/logout" class="nav-logout">Log Out</a>
+</nav>
+
+<main>
+  <div class="page-header">
+    <div class="page-title"><span>{{ guild_name }}</span> — Roster</div>
+    <div class="page-sub">// Add or remove members · Changes take effect immediately</div>
+  </div>
+
+  <div class="grid">
+    <!-- Left: Member List -->
+    <div class="card">
+      <div class="card-title">Members</div>
+      <div class="member-count" id="member-count">{{ members|length }} members</div>
+
+      <!-- Add member -->
+      <div class="add-wrap" style="margin-bottom:16px;">
+        <input class="add-input" id="add-input" type="text" placeholder="Player name" autocomplete="off">
+        <button class="btn btn-add" id="add-btn">Add</button>
+        <div class="autocomplete-list" id="ac-list"></div>
+      </div>
+
+      <div class="member-list" id="member-list">
+        {% for name in members %}
+        <div class="member-row" data-name="{{ name }}">
+          <span class="member-name">{{ name }}</span>
+          <button class="btn btn-danger" onclick="removeMember('{{ name }}')">Remove</button>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- Right: Change Password -->
+    <div class="card" style="align-self: start;">
+      <div class="card-title">Change Password</div>
+      <div class="pw-field">
+        <label class="pw-label">Current Password</label>
+        <input class="pw-input" id="pw-current" type="password" placeholder="Leave blank if not yet set">
+      </div>
+      <div class="pw-field">
+        <label class="pw-label">New Password</label>
+        <input class="pw-input" id="pw-new" type="password" placeholder="Min. 8 characters">
+      </div>
+      <div class="pw-field">
+        <label class="pw-label">Confirm New Password</label>
+        <input class="pw-input" id="pw-confirm" type="password" placeholder="Repeat new password">
+      </div>
+      <button class="btn btn-save" id="pw-save-btn">Save Password</button>
+      <div class="pw-note" id="pw-note"></div>
+    </div>
+  </div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const ALL_PLAYERS = {{ all_players | tojson }};
+let acHighlight = -1;
+
+// ── Autocomplete ──────────────────────────────────────────────────────────────
+const addInput  = document.getElementById('add-input');
+const acList    = document.getElementById('ac-list');
+
+function showAc(val) {
+  if (!val) { acList.classList.remove('open'); return; }
+  const matches = ALL_PLAYERS.filter(p => p.toLowerCase().startsWith(val.toLowerCase())).slice(0, 10);
+  if (!matches.length) { acList.classList.remove('open'); return; }
+  acList.innerHTML = matches.map(m => `<div class="ac-item" data-name="${m}">${m}</div>`).join('');
+  acList.classList.add('open');
+  acHighlight = -1;
+  acList.querySelectorAll('.ac-item').forEach(el => {
+    el.addEventListener('mousedown', e => { e.preventDefault(); addInput.value = el.dataset.name; acList.classList.remove('open'); });
+  });
+}
+
+addInput.addEventListener('input', () => showAc(addInput.value));
+addInput.addEventListener('keydown', e => {
+  const items = acList.querySelectorAll('.ac-item');
+  if (e.key === 'ArrowDown') { acHighlight = Math.min(acHighlight + 1, items.length - 1); }
+  else if (e.key === 'ArrowUp') { acHighlight = Math.max(acHighlight - 1, -1); }
+  else if (e.key === 'Enter') { e.preventDefault(); if (acHighlight >= 0) { addInput.value = items[acHighlight].dataset.name; acList.classList.remove('open'); } else { doAdd(); } return; }
+  else if (e.key === 'Escape') { acList.classList.remove('open'); return; }
+  items.forEach((el, i) => el.classList.toggle('highlighted', i === acHighlight));
+});
+document.addEventListener('click', e => { if (!e.target.closest('.add-wrap')) acList.classList.remove('open'); });
+
+// ── Add / Remove ──────────────────────────────────────────────────────────────
+document.getElementById('add-btn').addEventListener('click', doAdd);
+
+async function doAdd() {
+  const name = addInput.value.trim();
+  if (!name) return;
+  acList.classList.remove('open');
+  // Check not already in list
+  if (document.querySelector(`#member-list .member-row[data-name="${CSS.escape(name)}"]`)) {
+    toast(`${name} is already in the roster`, 'error'); return;
+  }
+  const res = await fetch('/guild/roster/add', {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ name }),
+  });
+  const d = await res.json();
+  if (!res.ok) { toast(d.error || 'Error adding member', 'error'); return; }
+  // Append to list
+  const row = document.createElement('div');
+  row.className = 'member-row'; row.dataset.name = name;
+  row.innerHTML = `<span class="member-name">${name}</span><button class="btn btn-danger" onclick="removeMember('${name}')">Remove</button>`;
+  document.getElementById('member-list').appendChild(row);
+  addInput.value = '';
+  updateCount();
+  toast(`Added ${name}`, 'success');
+}
+
+async function removeMember(name) {
+  const res = await fetch('/guild/roster/remove', {
+    method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ name }),
+  });
+  const d = await res.json();
+  if (!res.ok) { toast(d.error || 'Error removing member', 'error'); return; }
+  document.querySelector(`#member-list .member-row[data-name="${CSS.escape(name)}"]`)?.remove();
+  updateCount();
+  toast(`Removed ${name}`, 'success');
+}
+
+function updateCount() {
+  const n = document.querySelectorAll('#member-list .member-row').length;
+  document.getElementById('member-count').textContent = `${n} member${n !== 1 ? 's' : ''}`;
+}
+
+// ── Password ──────────────────────────────────────────────────────────────────
+document.getElementById('pw-save-btn').addEventListener('click', async () => {
+  const current = document.getElementById('pw-current').value;
+  const newPw   = document.getElementById('pw-new').value;
+  const confirm = document.getElementById('pw-confirm').value;
+  const note    = document.getElementById('pw-note');
+  note.textContent = '';
+  if (newPw.length < 8) { note.textContent = 'Password must be at least 8 characters.'; note.style.color = 'var(--red)'; return; }
+  if (newPw !== confirm) { note.textContent = 'Passwords do not match.'; note.style.color = 'var(--red)'; return; }
+  const res = await fetch('/guild/roster/set-password', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ current, new: newPw }),
+  });
+  const d = await res.json();
+  if (!res.ok) { note.textContent = d.error || 'Error saving password.'; note.style.color = 'var(--red)'; return; }
+  document.getElementById('pw-current').value = '';
+  document.getElementById('pw-new').value = '';
+  document.getElementById('pw-confirm').value = '';
+  toast('Password updated', 'success');
+});
+
+// ── Toast ─────────────────────────────────────────────────────────────────────
+let toastTimer;
+function toast(msg, type = 'success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `toast ${type} show`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2800);
+}
+</script>
+</body>
+</html>

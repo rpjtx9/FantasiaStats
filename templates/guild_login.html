@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guild Login — FantasiaStats.WIN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0b0e1a; --surface: #111827; --card: #141d2e; --border: #1e2d47;
+  --accent: #00d4ff; --green: #10b981; --red: #ef4444;
+  --text: #e2e8f0; --muted: #64748b;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  background: var(--bg); color: var(--text); font-family: 'Barlow', sans-serif;
+  min-height: 100vh; display: flex; flex-direction: column;
+}
+body::before {
+  content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 9999;
+  background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+}
+nav {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(11,14,26,0.92); backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 32px; display: flex; align-items: center; gap: 24px; min-height: 56px;
+}
+.nav-logo { font-family: 'Rajdhani',sans-serif; font-size: 20px; font-weight: 700; letter-spacing: 0.1em; color: var(--accent); text-transform: uppercase; text-decoration: none; }
+.nav-logo span { color: var(--text); }
+.nav-back { color: var(--muted); text-decoration: none; font-size: 14px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; padding: 6px 12px; border-radius: 4px; transition: color 0.15s, background 0.15s; }
+.nav-back:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+
+main {
+  flex: 1; display: flex; align-items: center; justify-content: center; padding: 40px 24px;
+}
+.login-card {
+  background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+  padding: 36px 40px; width: 100%; max-width: 400px; position: relative; overflow: hidden;
+}
+.login-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent); opacity: 0.4;
+}
+.login-title {
+  font-family: 'Rajdhani', sans-serif; font-size: 26px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--text); margin-bottom: 6px;
+}
+.login-sub {
+  font-family: 'Share Tech Mono', monospace; font-size: 12px; color: var(--muted);
+  margin-bottom: 28px;
+}
+.field { margin-bottom: 18px; }
+label {
+  display: block; font-family: 'Share Tech Mono', monospace; font-size: 11px;
+  color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; margin-bottom: 7px;
+}
+select, input[type="password"] {
+  width: 100%; background: var(--surface); border: 1px solid var(--border);
+  color: var(--text); font-family: 'Barlow', sans-serif; font-size: 15px;
+  padding: 10px 12px; border-radius: 5px; outline: none;
+  transition: border-color 0.15s; appearance: none; -webkit-appearance: none;
+}
+select { cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2364748b' d='M6 8L0 0h12z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+select:focus, input[type="password"]:focus { border-color: var(--accent); }
+select option { background: var(--surface); }
+.error-msg {
+  background: rgba(239,68,68,0.1); border: 1px solid rgba(239,68,68,0.3);
+  color: #fca5a5; font-family: 'Share Tech Mono', monospace; font-size: 12px;
+  padding: 10px 12px; border-radius: 5px; margin-bottom: 18px;
+}
+.btn-login {
+  width: 100%; background: var(--accent); color: #0b0e1a;
+  font-family: 'Rajdhani', sans-serif; font-size: 16px; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  border: none; border-radius: 5px; padding: 12px; cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.btn-login:hover { opacity: 0.88; }
+.btn-login:active { transform: scale(0.98); }
+</style>
+</head>
+<body>
+<nav>
+  <a href="/" class="nav-logo">FantasiaStats<span>.win</span></a>
+  <a href="/" class="nav-back">← Dashboard</a>
+</nav>
+<main>
+  <div class="login-card">
+    <div class="login-title">Guild Login</div>
+    <div class="login-sub">// Manage your guild roster</div>
+
+    {% if error %}
+    <div class="error-msg">{{ error }}</div>
+    {% endif %}
+
+    <form method="POST" action="/guild/login">
+      <div class="field">
+        <label>Guild</label>
+        <select name="guild">
+          {% for g in guilds %}
+          <option value="{{ g }}">{{ g }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>Password</label>
+        <input type="password" name="password" placeholder="Enter guild password" autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn-login">Enter</button>
+    </form>
+  </div>
+</main>
+</body>
+</html>

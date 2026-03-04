@@ -5,15 +5,17 @@ Run: python app.py
 Then open: http://localhost:5000
 """
 
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, session, redirect, url_for
 import sqlite3
 from pathlib import Path
 from datetime import datetime, timedelta
 from collections import Counter
 import os
+import bcrypt
 
 
 app = Flask(__name__)
+app.secret_key = os.environ.get("SECRET_KEY", os.urandom(24))
 DB_PATH = Path(os.environ.get("DATA_DIR", "data")) / "fantasia.db"
 
 JOB_NAMES = {
@@ -822,8 +824,19 @@ def api_jobs_level_distribution():
 def api_guilds():
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT name FROM guilds ORDER BY name")
-    names = [r[0] for r in cursor.fetchall()]
+    try:
+        cursor.execute("""
+            SELECT g.name FROM guilds g
+            WHERE EXISTS (SELECT 1 FROM guild_members gm WHERE gm.guild_id = g.id)
+            ORDER BY g.name
+        """)
+        names = [r[0] for r in cursor.fetchall()]
+    except Exception:
+        try:
+            from guilds import GUILDS
+            names = list(GUILDS.keys())
+        except ImportError:
+            names = []
     conn.close()
     return jsonify(names)
 
@@ -837,19 +850,25 @@ def api_guild():
     conn = get_connection()
     cursor = conn.cursor()
 
-    cursor.execute("SELECT id, name FROM guilds ORDER BY name")
-    guilds = {r[1]: r[0] for r in cursor.fetchall()}
-
-    if not guilds:
-        conn.close()
-        return jsonify({"error": "No guilds configured"}), 404
-
-    if not guild_name or guild_name not in guilds:
-        guild_name = next(iter(guilds))
-
-    guild_id = guilds[guild_name]
-    cursor.execute("SELECT player_name FROM guild_members WHERE guild_id = ?", (guild_id,))
-    MEMBERS = [r[0] for r in cursor.fetchall()]
+    try:
+        cursor.execute("SELECT id, name FROM guilds ORDER BY name")
+        guilds = {r[1]: r[0] for r in cursor.fetchall()}
+        if not guilds:
+            raise Exception("empty")
+        if not guild_name or guild_name not in guilds:
+            guild_name = next(iter(guilds))
+        guild_id = guilds[guild_name]
+        cursor.execute("SELECT player_name FROM guild_members WHERE guild_id = ?", (guild_id,))
+        MEMBERS = [r[0] for r in cursor.fetchall()]
+    except Exception:
+        try:
+            from guilds import GUILDS
+        except ImportError:
+            conn.close()
+            return jsonify({"error": "No guilds configured"}), 404
+        if not guild_name or guild_name not in GUILDS:
+            guild_name = next(iter(GUILDS))
+        MEMBERS = GUILDS[guild_name]
     conn.close()
 
     if not MEMBERS:
@@ -914,6 +933,129 @@ def api_guild():
         "top_quests": sorted([m for m in members if m["quest_delta"] > 0], key=lambda x: x["quest_delta"], reverse=True)[:10],
         "top_cards":  sorted([m for m in members if m["card_delta"] > 0], key=lambda x: x["card_delta"], reverse=True)[:10],
     })
+
+
+# ─── Guild Roster Management ──────────────────────────────────────────────────
+
+@app.route("/guild/login", methods=["GET", "POST"])
+def guild_login():
+    error = None
+    if request.method == "POST":
+        guild_name = request.form.get("guild", "").strip()
+        password   = request.form.get("password", "").encode()
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, password FROM guilds WHERE name = ?", (guild_name,))
+        row = cursor.fetchone()
+        conn.close()
+        if row:
+            # No password set yet — allow entry so they can set one
+            if not row["password"]:
+                session["guild_id"]   = row["id"]
+                session["guild_name"] = guild_name
+                return redirect(url_for("guild_roster"))
+            if bcrypt.checkpw(password, row["password"].encode()):
+                session["guild_id"]   = row["id"]
+                session["guild_name"] = guild_name
+                return redirect(url_for("guild_roster"))
+        error = "Incorrect guild name or password."
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT name FROM guilds ORDER BY name")
+        guilds = [r[0] for r in cursor.fetchall()]
+    except Exception:
+        guilds = []
+    conn.close()
+    return render_template("guild_login.html", guilds=guilds, error=error)
+
+@app.route("/guild/logout")
+def guild_logout():
+    session.clear()
+    return redirect(url_for("guild_login"))
+
+@app.route("/guild/roster")
+def guild_roster():
+    if "guild_id" not in session:
+        return redirect(url_for("guild_login"))
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT player_name FROM guild_members WHERE guild_id = ? ORDER BY player_name",
+        (session["guild_id"],)
+    )
+    members = [r[0] for r in cursor.fetchall()]
+    # All known player names for autocomplete
+    cursor.execute("SELECT DISTINCT name FROM players ORDER BY name")
+    all_players = [r[0] for r in cursor.fetchall()]
+    conn.close()
+    return render_template("guild_roster.html",
+        guild_name=session["guild_name"],
+        members=members,
+        all_players=all_players,
+    )
+
+@app.route("/guild/roster/add", methods=["POST"])
+def guild_roster_add():
+    if "guild_id" not in session:
+        return jsonify({"error": "Not authenticated"}), 401
+    name = request.json.get("name", "").strip()
+    if not name:
+        return jsonify({"error": "Name required"}), 400
+    conn = get_connection()
+    cursor = conn.cursor()
+    try:
+        cursor.execute(
+            "INSERT OR IGNORE INTO guild_members (guild_id, player_name) VALUES (?, ?)",
+            (session["guild_id"], name)
+        )
+        conn.commit()
+    except Exception as e:
+        conn.close()
+        return jsonify({"error": str(e)}), 500
+    conn.close()
+    return jsonify({"ok": True})
+
+@app.route("/guild/roster/remove", methods=["POST"])
+def guild_roster_remove():
+    if "guild_id" not in session:
+        return jsonify({"error": "Not authenticated"}), 401
+    name = request.json.get("name", "").strip()
+    if not name:
+        return jsonify({"error": "Name required"}), 400
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        "DELETE FROM guild_members WHERE guild_id = ? AND player_name = ?",
+        (session["guild_id"], name)
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+@app.route("/guild/roster/set-password", methods=["POST"])
+def guild_roster_set_password():
+    if "guild_id" not in session:
+        return jsonify({"error": "Not authenticated"}), 401
+    data = request.json
+    current  = data.get("current", "").encode()
+    new_pw   = data.get("new", "").strip()
+    if len(new_pw) < 8:
+        return jsonify({"error": "Password must be at least 8 characters"}), 400
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT password FROM guilds WHERE id = ?", (session["guild_id"],))
+    row = cursor.fetchone()
+    # Allow setting password if currently blank, otherwise verify current
+    if row["password"] and not bcrypt.checkpw(current, row["password"].encode()):
+        conn.close()
+        return jsonify({"error": "Current password is incorrect"}), 403
+    hashed = bcrypt.hashpw(new_pw.encode(), bcrypt.gensalt()).decode()
+    cursor.execute("UPDATE guilds SET password = ? WHERE id = ?", (hashed, session["guild_id"]))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
 
 if __name__ == "__main__":
     import os
