@@ -130,7 +130,6 @@ def get_snapshot_closest_to_hours_ago(hours):
     conn.close()
 
     fmt = "%Y-%m-%d_%H-%M-%S"
-    closest = min(rows, key=lambda r: abs(
-        (datetime.strptime(r["timestamp"], fmt) - target_ts).total_seconds()
-    ))
-    return closest
+    if not rows:
+        return None
+    return min(rows, key=lambda r: abs((datetime.strptime(r["timestamp"], fmt) - target_ts).total_seconds()))

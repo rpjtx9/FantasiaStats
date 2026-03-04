@@ -127,12 +127,12 @@ def exp_to_level_percent(exp_gained, current_level):
     return round((exp_gained / level_exp) * 100, 1)
 
 def snapshot_closest_to(cursor, target_ts):
-    """Return the snapshot row closest to target_ts (a datetime object)."""
+    """Return the snapshot nearest in time to target_ts (a datetime object)."""
     cursor.execute("SELECT id, timestamp FROM snapshots ORDER BY timestamp")
     rows = [dict(row) for row in cursor.fetchall()]
-    return min(rows, key=lambda r: abs(
-        (datetime.strptime(r["timestamp"], TS_FMT) - target_ts).total_seconds()
-    ))
+    if not rows:
+        return None
+    return min(rows, key=lambda r: abs((datetime.strptime(r["timestamp"], TS_FMT) - target_ts).total_seconds()))
 
 def get_snapshot_window(hours=None, start=None, end=None):
     """
@@ -286,12 +286,6 @@ def api_activity():
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Find the snapshot immediately before prev to use as exclusive lower bound,
-    # so that prev's own activity rows (which represent activity up to prev) are included
-    cursor.execute("SELECT id FROM snapshots WHERE id < ? ORDER BY id DESC LIMIT 1", (prev_id,))
-    before_prev = cursor.fetchone()
-    lower_bound = before_prev[0] if before_prev else prev_id - 1
-
     cursor.execute("""
         SELECT pa.name, SUM(pa.exp_gained) as exp_gained, p.job, p.level
         FROM player_activity pa
@@ -299,7 +293,7 @@ def api_activity():
         WHERE pa.snapshot_id IN (SELECT id FROM snapshots WHERE id > ? AND id <= ?)
         GROUP BY pa.name
         ORDER BY exp_gained DESC
-    """, (latest_id, lower_bound, latest_id))
+    """, (latest_id, prev_id, latest_id))
     active = [dict(row) for row in cursor.fetchall()]
 
     cursor.execute("""
@@ -374,11 +368,17 @@ def api_server_health():
         day_snaps = days[day]
         min_id = day_snaps[0]["id"]
         max_id = day_snaps[-1]["id"]
-        # Find the snapshot just before this day to use as the lower bound
+        # The first snapshot in a day is the *baseline* — its player_activity
+        # records belong to the previous period, but all subsequent snapshots
+        # within (and up to the next day's baseline) represent this day's gains.
+        # lower_id = day's first snap (baseline); upper_id = next day's first snap (next baseline)
+        # Query: id > lower_id AND id <= upper_id captures exactly this day's activity.
         prev_snap = next((s for s in reversed(all_snapshots) if s["id"] < min_id), None)
-        lower_id = prev_snap["id"] if prev_snap else min_id - 1
+        lower_id = min_id
         next_day = (datetime.strptime(day, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
         next_day_snaps = days.get(next_day, [])
+        # Next day's first snap is that day's baseline — use it as our upper bound
+        # so its activity isn't double-counted in our day
         upper_id = next_day_snaps[0]["id"] if next_day_snaps else max_id
         cursor.execute("""
             SELECT COUNT(DISTINCT pa.name) as cnt
