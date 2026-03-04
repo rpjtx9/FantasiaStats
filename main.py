@@ -6,25 +6,22 @@ from fetch import fetch_all_players, save_snapshot, load_snapshot, get_latest_sn
 from analyze import level_distribution, level_distribution_by_class_grouped, job_popularity, active_players, summary
 from database import initialize_db, ingest_snapshot
 
-def get_visualize():
-    from visualize import plot_level_distribution, plot_level_distribution_by_class, plot_activity_card, plot_server_health, plot_retention, plot_guild_card, plot_active_player_distribution
-    return plot_level_distribution, plot_level_distribution_by_class, plot_activity_card, plot_server_health, plot_retention, plot_guild_card, plot_active_player_distribution
 
 def run_fetch():
     print("=== Fetching Rankings ===")
     players = fetch_all_players()
     filepath = save_snapshot(players)
-    
+
     # extract timestamp from filename and ingest into db
     timestamp = filepath.stem.replace("rankings_", "")
-    
+
     snapshots = get_latest_snapshots(2)
     activity = None
     if len(snapshots) == 2:
         today = load_snapshot(snapshots[0])
         yesterday = load_snapshot(snapshots[1])
         activity = active_players(today, yesterday)
-    
+
     ingest_snapshot(timestamp, players, activity)
 
 def run_analyze():
@@ -74,67 +71,47 @@ def run_analyze():
 def run_backfill():
     print("=== Backfilling Database from JSON Snapshots ===")
     snapshots = sorted(Path("data/snapshots").glob("rankings_*.json"))
-    
+
     if not snapshots:
         print("No snapshots found.")
         return
-    
+
     print(f"Found {len(snapshots)} snapshots.")
-    
+
     for i, filepath in enumerate(snapshots):
         timestamp = filepath.stem.replace("rankings_", "")
         players = load_snapshot(filepath)
-        
+
         # calculate activity by comparing to previous snapshot if available
         activity = None
         if i > 0:
             yesterday = load_snapshot(snapshots[i - 1])
             activity = active_players(players, yesterday)
-        
+
         ingest_snapshot(timestamp, players, activity)
-    
+
     print("Backfill complete.")
 
 def main():
     initialize_db()
-    
+
     parser = argparse.ArgumentParser(description="Fantasia Rankings Tool")
     parser.add_argument("--fetch", action="store_true", help="Fetch latest rankings and save snapshot")
     parser.add_argument("--analyze", action="store_true", help="Run analysis on latest snapshots")
     parser.add_argument("--all", action="store_true", help="Fetch and then analyze")
     parser.add_argument("--backfill", action="store_true", help="Ingest all existing JSON snapshots into the database")
-    parser.add_argument("--visualize", action="store_true", help="Generate charts from latest snapshot")
     parser.add_argument("--hours", type=int, default=None, help="Compare against snapshot closest to X hours ago")
     args = parser.parse_args()
 
     if args.all:
         run_fetch()
         run_analyze()
-        plot_level_distribution, plot_level_distribution_by_class, plot_activity_card, plot_server_health, plot_retention, plot_guild_card, plot_active_player_distribution = get_visualize()
-        plot_level_distribution()
-        plot_level_distribution_by_class()
-        plot_activity_card(hours=args.hours)
-        plot_server_health()
-        plot_retention()
-        plot_guild_card(hours=args.hours)
-        plot_active_player_distribution(hours=args.hours)
     elif args.fetch:
         run_fetch()
     elif args.analyze:
         run_analyze()
-        plot_level_distribution, plot_level_distribution_by_class, plot_activity_card, plot_server_health, plot_retention, plot_guild_card, plot_active_player_distribution = get_visualize()
-        plot_activity_card(hours=args.hours)
     elif args.backfill:
         run_backfill()
-    elif args.visualize:
-        plot_level_distribution, plot_level_distribution_by_class, plot_activity_card, plot_server_health, plot_retention, plot_guild_card, plot_active_player_distribution = get_visualize()
-        plot_level_distribution()
-        plot_level_distribution_by_class()
-        plot_activity_card(hours=args.hours)
-        plot_server_health()
-        plot_retention()
-        plot_guild_card(hours=args.hours)
-        plot_active_player_distribution(hours=args.hours)
     else:
         parser.print_help()
 

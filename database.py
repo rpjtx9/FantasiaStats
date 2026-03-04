@@ -114,22 +114,3 @@ def ingest_snapshot(timestamp, players, activity=None):
 
     print(f"Ingested snapshot {timestamp} — {len(players)} players.")
     return snapshot_id
-
-def get_snapshot_closest_to_hours_ago(hours):
-    from datetime import datetime, timedelta
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("SELECT id, timestamp FROM snapshots ORDER BY id DESC LIMIT 1")
-    latest = cursor.fetchone()
-    latest_ts = datetime.strptime(latest["timestamp"], "%Y-%m-%d_%H-%M-%S")
-    target_ts = latest_ts - timedelta(hours=hours)
-
-    cursor.execute("SELECT id, timestamp FROM snapshots ORDER BY timestamp")
-    rows = [dict(row) for row in cursor.fetchall()]
-    conn.close()
-
-    fmt = "%Y-%m-%d_%H-%M-%S"
-    if not rows:
-        return None
-    return min(rows, key=lambda r: abs((datetime.strptime(r["timestamp"], fmt) - target_ts).total_seconds()))

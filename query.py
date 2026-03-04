@@ -1,10 +1,8 @@
 import argparse
 import json
 from database import get_connection
-from analyze import JOB_NAMES
-from visualize import plot_player_scorecard
+from analyze import JOB_NAMES, calculate_exp_gained
 from datetime import datetime, timedelta
-from analyze import calculate_exp_gained
 
 def get_player_progression(name):
     conn = get_connection()
@@ -88,7 +86,6 @@ def main():
 
     if args.player:
         print_player_progression(args.player, hours=args.hours)
-        plot_player_scorecard(args.player, hours=args.hours)
     elif args.top:
         print_top_players(args.top, hours=args.hours)
 
