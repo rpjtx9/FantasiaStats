@@ -82,7 +82,10 @@ def index():
 
 @app.route("/guild")
 def guild_page():
-    return render_template("guild.html")
+    return render_template("guild.html",
+        session_guild_id=session.get("guild_id"),
+        session_guild_name=session.get("guild_name"),
+    )
 
 @app.route("/player")
 @app.route("/player/<n>")
@@ -897,12 +900,7 @@ def guild_login():
         row = cursor.fetchone()
         conn.close()
         if row:
-            # No password set yet — allow entry so they can set one
-            if not row["password"]:
-                session["guild_id"]   = row["id"]
-                session["guild_name"] = guild_name
-                return redirect(url_for("guild_roster"))
-            if bcrypt.checkpw(password, row["password"].encode()):
+            if row["password"] and bcrypt.checkpw(password, row["password"].encode()):
                 session["guild_id"]   = row["id"]
                 session["guild_name"] = guild_name
                 return redirect(url_for("guild_roster"))
