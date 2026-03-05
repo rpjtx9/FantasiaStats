@@ -448,7 +448,12 @@ function openJobDetail(jobId, jobName) {
 function toggleJobPlayers(card, jobId) {
   const section = card.closest('.class-section');
   const existing = section.querySelector(`.player-list[data-job="${jobId}"]`);
-  if (existing) { existing.remove(); return; }
+
+  // Close all open player lists
+  document.querySelectorAll('.player-list').forEach(el => el.remove());
+
+  // If we just closed the one we clicked, we're done (toggle off)
+  if (existing) return;
 
   const detail = apiData.job_details[jobId];
   if (!detail || !detail.players.length) return;
