@@ -443,15 +443,20 @@ def api_retention():
     weeks = sorted(set(s["week"] for s in snapshots))
     current_week = max(weeks)
 
+    MIN_ACTIVE_EXP = 1265  # total exp to reach level 8
+
     def week_active_players(week):
         snap_ids = [s["id"] for s in snapshots if s["week"] == week]
         placeholders = ",".join("?" * len(snap_ids))
         conn2 = get_connection()
         cur2 = conn2.cursor()
         cur2.execute(f"""
-            SELECT DISTINCT name FROM player_activity
+            SELECT name, COUNT(*) as instances, SUM(exp_gained) as total_exp
+            FROM player_activity
             WHERE snapshot_id IN ({placeholders}) AND exp_gained > 0
-        """, snap_ids)
+            GROUP BY name
+            HAVING COUNT(*) >= 2 OR SUM(exp_gained) >= ?
+        """, snap_ids + [MIN_ACTIVE_EXP])
         result = set(r[0] for r in cur2.fetchall())
         conn2.close()
         return result
