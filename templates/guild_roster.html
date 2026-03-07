@@ -158,10 +158,25 @@ main { max-width: 900px; margin: 0 auto; padding: 32px 24px; }
       </div>
 
       <div class="member-list" id="member-list">
-        {% for name in members %}
-        <div class="member-row" data-name="{{ name }}">
-          <span class="member-name">{{ name }}</span>
-          <button class="btn btn-danger" onclick="removeMember('{{ name }}')">Remove</button>
+        {% for m in members %}
+        <div class="member-row" data-name="{{ m.name }}">
+          <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
+            <span class="member-name">{{ m.name }}</span>
+            {% if m.last_active %}
+              {% set ts = m.last_active %}
+              {# days_ago approximation: compare date portion only #}
+              <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
+                <div class="activity-dot" data-ts="{{ ts }}"></div>
+                <span class="activity-label" data-ts="{{ ts }}" style="font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:.06em;text-transform:uppercase;"></span>
+              </div>
+            {% else %}
+              <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
+                <div style="width:8px;height:8px;border-radius:50%;background:#64748b;flex-shrink:0;"></div>
+                <span style="font-family:'Share Tech Mono',monospace;font-size:11px;color:#64748b;letter-spacing:.06em;text-transform:uppercase;">Never active</span>
+              </div>
+            {% endif %}
+          </div>
+          <button class="btn btn-danger" onclick="removeMember('{{ m.name }}')">Remove</button>
         </div>
         {% endfor %}
       </div>
@@ -221,7 +236,25 @@ addInput.addEventListener('keydown', e => {
 });
 document.addEventListener('click', e => { if (!e.target.closest('.add-wrap')) acList.classList.remove('open'); });
 
-// ── Add / Remove ──────────────────────────────────────────────────────────────
+// ── Activity Flags ────────────────────────────────────────────────────────────
+function renderActivityFlags() {
+  document.querySelectorAll('.activity-dot[data-ts]').forEach(dot => {
+    const ts = dot.dataset.ts;
+    const label = dot.nextElementSibling;
+    const [datePart, timePart] = ts.split('_');
+    const t = new Date(datePart + 'T' + timePart.replace(/-/g, ':') + 'Z');
+    const daysAgo = Math.floor((Date.now() - t) / (1000 * 60 * 60 * 24));
+    const isActive = daysAgo < 30;
+    const color = isActive ? '#22c55e' : '#64748b';
+    const text = daysAgo === 0 ? 'Active today' : `Last active ${daysAgo}d ago`;
+    dot.style.cssText = `width:8px;height:8px;border-radius:50%;background:${color};${isActive ? 'box-shadow:0 0 6px '+color+';' : ''}flex-shrink:0;`;
+    label.textContent = text;
+    label.style.color = color;
+  });
+}
+renderActivityFlags();
+
+
 document.getElementById('add-btn').addEventListener('click', doAdd);
 
 async function doAdd() {
@@ -240,7 +273,15 @@ async function doAdd() {
   // Append to list
   const row = document.createElement('div');
   row.className = 'member-row'; row.dataset.name = name;
-  row.innerHTML = `<span class="member-name">${name}</span><button class="btn btn-danger" onclick="removeMember('${name}')">Remove</button>`;
+  row.innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
+      <span class="member-name">${name}</span>
+      <div style="display:flex;align-items:center;gap:5px;flex-shrink:0;">
+        <div style="width:8px;height:8px;border-radius:50%;background:#64748b;flex-shrink:0;"></div>
+        <span style="font-family:'Share Tech Mono',monospace;font-size:11px;color:#64748b;letter-spacing:.06em;text-transform:uppercase;">Never active</span>
+      </div>
+    </div>
+    <button class="btn btn-danger" onclick="removeMember('${name}')">Remove</button>`;
   document.getElementById('member-list').appendChild(row);
   addInput.value = '';
   updateCount();

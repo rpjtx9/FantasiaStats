@@ -48,6 +48,23 @@ def initialize_db():
         CREATE INDEX IF NOT EXISTS idx_players_name ON players(name);
         CREATE INDEX IF NOT EXISTS idx_activity_snapshot ON player_activity(snapshot_id);
         CREATE INDEX IF NOT EXISTS idx_activity_name ON player_activity(name);
+
+        CREATE TABLE IF NOT EXISTS guilds (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            password TEXT
+        );
+
+        CREATE TABLE IF NOT EXISTS guild_members (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            guild_id INTEGER NOT NULL,
+            player_name TEXT NOT NULL,
+            UNIQUE(guild_id, player_name),
+            FOREIGN KEY (guild_id) REFERENCES guilds(id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_guild_members_guild ON guild_members(guild_id);
+        CREATE INDEX IF NOT EXISTS idx_guild_members_player ON guild_members(player_name);
     """)
 
     conn.commit()
