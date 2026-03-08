@@ -308,7 +308,10 @@ async function loadPlayer(name) {
               return (new Date() - new Date(t)) < 30*24*60*60*1000;
             })();
             let color, label, tooltip;
-            if (!d.last_active) {
+            if (d.is_deleted) {
+              color = '#ef4444'; label = 'Deleted';
+              tooltip = 'No longer appears in rankings';
+            } else if (!d.last_active) {
               color = '#64748b'; label = 'Inactive';
               tooltip = 'Never seen active';
             } else {

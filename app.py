@@ -537,6 +537,13 @@ def api_player(name):
     """, (name,))
     last_active_row = cursor.fetchone()
     last_active = last_active_row["last_active"] if last_active_row else None
+
+    # Check if player is absent from the latest snapshot
+    cursor.execute("SELECT MAX(id) FROM snapshots")
+    latest_snap_id = cursor.fetchone()[0]
+    cursor.execute("SELECT 1 FROM players WHERE snapshot_id = ? AND name = ?", (latest_snap_id, name))
+    is_deleted = cursor.fetchone() is None
+
     conn.close()
 
     if not rows:
@@ -583,6 +590,7 @@ def api_player(name):
         "levels_gained": latest["level"] - rows[0]["level"],
         "first_seen": rows[0]["timestamp"],
         "last_active": last_active,
+        "is_deleted": is_deleted,
         "days_tracked": (datetime.strptime(latest["timestamp"], TS_FMT) - datetime.strptime(rows[0]["timestamp"], TS_FMT)).days,
         "data_points": data_points,
     })
