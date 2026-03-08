@@ -77,6 +77,45 @@ main { max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
 @keyframes dots { 0%,20%{content:'.'} 40%,60%{content:'..'} 80%,100%{content:'...'} }
 .empty-state { color: var(--muted); font-size: 14px; text-align: center; padding: 40px; }
 .class-dot { border-radius: 50%; flex-shrink: 0; }
+
+/* Deleted players modal */
+.modal-backdrop {
+  display: none; position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+  align-items: center; justify-content: center;
+}
+.modal-backdrop.open { display: flex; }
+.modal {
+  background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+  width: 100%; max-width: 680px; max-height: 80vh; display: flex; flex-direction: column;
+  position: relative; overflow: hidden;
+}
+.modal::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--red), transparent); opacity: 0.5;
+}
+.modal-header {
+  padding: 20px 24px 16px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+}
+.modal-title { font-family: 'Rajdhani', sans-serif; font-size: 22px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; }
+.modal-close { background: none; border: none; color: var(--muted); font-size: 20px; cursor: pointer; padding: 4px 8px; border-radius: 4px; transition: color 0.15s; line-height: 1; }
+.modal-close:hover { color: var(--text); }
+.modal-sub { font-family: 'Share Tech Mono', monospace; font-size: 12px; color: var(--muted); margin-top: 4px; }
+.modal-body { overflow-y: auto; flex: 1; }
+.deleted-row {
+  display: flex; align-items: center; gap: 12px; padding: 11px 24px;
+  border-bottom: 1px solid rgba(255,255,255,0.03); cursor: pointer;
+  transition: background 0.1s;
+}
+.deleted-row:last-child { border-bottom: none; }
+.deleted-row:hover { background: rgba(255,255,255,0.04); }
+.deleted-name { font-size: 15px; font-weight: 600; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.deleted-meta { font-family: 'Share Tech Mono', monospace; font-size: 12px; color: var(--muted); white-space: nowrap; }
+.deleted-badge {
+  font-family: 'Share Tech Mono', monospace; font-size: 10px; letter-spacing: .06em;
+  text-transform: uppercase; padding: 2px 7px; border-radius: 3px; flex-shrink: 0;
+}
 </style>
 </head>
 <body>
@@ -110,9 +149,30 @@ main { max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
     <button class="search-btn" id="player-search-btn">Search</button>
   </div>
   <div class="search-results" id="search-results-dropdown"></div>
-  <div id="scorecard-container">
-    <!-- pre-load from URL param if present -->
+  <div style="margin-bottom:20px;">
+    <button id="deleted-players-btn" style="background:none;border:none;color:var(--muted);font-family:'Share Tech Mono',monospace;font-size:12px;letter-spacing:.06em;cursor:pointer;padding:0;display:flex;align-items:center;gap:6px;transition:color 0.15s;" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--muted)'">
+      <div style="width:7px;height:7px;border-radius:50%;background:var(--red);flex-shrink:0;"></div>
+      VIEW PLAYERS REMOVED FROM RANKINGS
+    </button>
   </div>
+
+  <!-- Deleted players modal -->
+  <div class="modal-backdrop" id="deleted-modal">
+    <div class="modal">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title" style="color:var(--red);">Players Removed from Rankings</div>
+          <div class="modal-sub" id="deleted-modal-sub">Players absent from the current rankings</div>
+        </div>
+        <button class="modal-close" id="deleted-modal-close">✕</button>
+      </div>
+      <div class="modal-body" id="deleted-modal-body">
+        <div class="loading" style="padding:40px;">Loading</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="scorecard-container"></div>
 </main>
 
 <script>
@@ -407,6 +467,76 @@ document.querySelectorAll('.mobile-preset').forEach(btn => {
     if (currentPlayer) loadPlayer(currentPlayer);
   });
 });
+// ── Deleted / Banned Players Modal ───────────────────────────────────────────
+const CLASS_COLORS_MAP = {
+  Beginner: '#95a5a6', Warrior: '#ff4444', Magician: '#bb44ff',
+  Archer: '#33ff77', Thief: '#4488ff', Pirate: '#ffaa00',
+};
+
+let deletedLoaded = false;
+
+function fmtTs(ts) {
+  if (!ts) return '—';
+  const [d] = ts.split('_');
+  return d;
+}
+
+function fmtExpShort(n) {
+  if (n >= 1_000_000) return (n/1e6).toFixed(1)+'M';
+  if (n >= 1_000) return (n/1e3).toFixed(0)+'K';
+  return n.toLocaleString();
+}
+
+async function openDeletedModal() {
+  document.getElementById('deleted-modal').classList.add('open');
+  if (deletedLoaded) return;
+  deletedLoaded = true;
+
+  const res = await fetch('/api/players/deleted');
+  const players = await res.json();
+
+  document.getElementById('deleted-modal-sub').textContent =
+    `${players.length} players absent from current rankings — click to view profile`;
+
+  const body = document.getElementById('deleted-modal-body');
+
+  if (!players.length) {
+    body.innerHTML = '<div class="empty-state">No deleted players found.</div>';
+    return;
+  }
+
+  body.innerHTML = players.map(p => {
+    const color = CLASS_COLORS_MAP[p.class] || '#aaa';
+    const lastSeenDate = fmtTs(p.last_seen);
+
+    // Determine if they had meaningful activity
+    const hasActivity = p.total_exp > 0;
+    const badgeColor = hasActivity ? 'rgba(239,68,68,0.15)' : 'rgba(100,116,139,0.15)';
+    const badgeText  = hasActivity ? 'WAS ACTIVE' : 'NO ACTIVITY';
+    const badgeBorder = hasActivity ? 'rgba(239,68,68,0.4)' : 'rgba(100,116,139,0.3)';
+    const badgeFg = hasActivity ? 'var(--red)' : 'var(--muted)';
+
+    return `<div class="deleted-row" onclick="closeDeletedModal(); loadPlayer('${p.name.replace(/'/g, "\\'")}')">
+      <div style="width:9px;height:9px;border-radius:50%;background:${color};flex-shrink:0;"></div>
+      <div class="deleted-name">${p.name}</div>
+      <div class="deleted-meta">Lv.${p.level} ${p.job_name}</div>
+      <div class="deleted-meta" style="min-width:70px;text-align:right;">last seen ${lastSeenDate}</div>
+      <div class="deleted-meta" style="min-width:60px;text-align:right;">${hasActivity ? '+'+fmtExpShort(p.total_exp) : '—'}</div>
+      <div class="deleted-badge" style="background:${badgeColor};border:1px solid ${badgeBorder};color:${badgeFg};">${badgeText}</div>
+    </div>`;
+  }).join('');
+}
+
+function closeDeletedModal() {
+  document.getElementById('deleted-modal').classList.remove('open');
+}
+
+document.getElementById('deleted-players-btn').addEventListener('click', openDeletedModal);
+document.getElementById('deleted-modal-close').addEventListener('click', closeDeletedModal);
+document.getElementById('deleted-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeDeletedModal();
+});
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeDeletedModal();
+});
 </script>
-</body>
-</html>

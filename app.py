@@ -785,6 +785,62 @@ def api_jobs_level_distribution():
 
     return jsonify(result)
 
+@app.route("/api/players/deleted")
+def api_players_deleted():
+    """Players who appeared in at least one snapshot but are absent from the latest."""
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT id FROM snapshots ORDER BY id DESC LIMIT 1")
+    latest_id = cursor.fetchone()[0]
+
+    # Names in latest snapshot
+    cursor.execute("SELECT DISTINCT name FROM players WHERE snapshot_id = ?", (latest_id,))
+    latest_names = set(r[0] for r in cursor.fetchall())
+
+    # Names that ever appeared but aren't in the latest
+    cursor.execute("SELECT DISTINCT name FROM players WHERE snapshot_id != ?", (latest_id,))
+    gone = [r[0] for r in cursor.fetchall() if r[0] not in latest_names]
+
+    results = []
+    for name in gone:
+        cursor.execute("""
+            SELECT s.timestamp, p.level, p.job, p.rank
+            FROM players p JOIN snapshots s ON p.snapshot_id = s.id
+            WHERE p.name = ? ORDER BY s.timestamp
+        """, (name,))
+        rows = [dict(r) for r in cursor.fetchall()]
+        if not rows:
+            continue
+        first, last = rows[0], rows[-1]
+
+        cursor.execute("SELECT SUM(exp_gained) FROM player_activity WHERE name = ?", (name,))
+        total_exp = cursor.fetchone()[0] or 0
+
+        cursor.execute("""
+            SELECT MAX(s.timestamp) FROM player_activity pa
+            JOIN snapshots s ON pa.snapshot_id = s.id
+            WHERE pa.name = ? AND pa.exp_gained > 0
+        """, (name,))
+        last_active = cursor.fetchone()[0]
+
+        results.append({
+            "name": name,
+            "level": last["level"],
+            "job_name": JOB_NAMES.get(last["job"], "Unknown"),
+            "class": get_class_for_job(last["job"]),
+            "rank": last["rank"],
+            "first_seen": first["timestamp"],
+            "last_seen": last["timestamp"],
+            "last_active": last_active,
+            "snapshots": len(rows),
+            "total_exp": total_exp,
+        })
+
+    results.sort(key=lambda x: x["level"], reverse=True)
+    conn.close()
+    return jsonify(results)
+
 @app.route("/api/guilds")
 def api_guilds():
     conn = get_connection()
@@ -935,21 +991,10 @@ def guild_roster():
         "SELECT player_name FROM guild_members WHERE guild_id = ? ORDER BY player_name",
         (session["guild_id"],)
     )
-    member_names = [r[0] for r in cursor.fetchall()]
+    members = [r[0] for r in cursor.fetchall()]
     # All known player names for autocomplete
     cursor.execute("SELECT DISTINCT name FROM players ORDER BY name")
     all_players = [r[0] for r in cursor.fetchall()]
-    # Fetch last_active timestamp per member
-    members = []
-    for name in member_names:
-        cursor.execute("""
-            SELECT MAX(s.timestamp) as last_active
-            FROM player_activity pa
-            JOIN snapshots s ON pa.snapshot_id = s.id
-            WHERE pa.name = ? AND pa.exp_gained > 0
-        """, (name,))
-        row = cursor.fetchone()
-        members.append({"name": name, "last_active": row["last_active"] if row else None})
     conn.close()
     return render_template("guild_roster.html",
         guild_name=session["guild_name"],
