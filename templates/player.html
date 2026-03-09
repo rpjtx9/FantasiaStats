@@ -102,6 +102,9 @@ main { max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
 .modal-close { background: none; border: none; color: var(--muted); font-size: 20px; cursor: pointer; padding: 4px 8px; border-radius: 4px; transition: color 0.15s; line-height: 1; }
 .modal-close:hover { color: var(--text); }
 .modal-sub { font-family: 'Share Tech Mono', monospace; font-size: 12px; color: var(--muted); margin-top: 4px; }
+.del-sort-btn { background:none;border:1px solid rgba(255,255,255,0.1);color:var(--muted);font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:.06em;padding:3px 10px;border-radius:3px;cursor:pointer;transition:all 0.15s; }
+.del-sort-btn:hover { color:var(--text);border-color:rgba(255,255,255,0.25); }
+.del-sort-btn.active { color:var(--red);border-color:var(--red);background:rgba(239,68,68,0.1); }
 .modal-body { overflow-y: auto; flex: 1; }
 .deleted-row {
   display: flex; align-items: center; gap: 12px; padding: 11px 24px;
@@ -165,6 +168,13 @@ main { max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
           <div class="modal-sub" id="deleted-modal-sub">Players absent from the current rankings</div>
         </div>
         <button class="modal-close" id="deleted-modal-close">✕</button>
+      </div>
+      <div style="display:flex;gap:6px;padding:10px 16px 6px;border-bottom:1px solid rgba(255,255,255,0.06);flex-wrap:wrap;">
+        <span style="font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--muted);align-self:center;margin-right:4px;">SORT:</span>
+        <button class="del-sort-btn active" data-sort="level" onclick="setDeletedSort('level')">LEVEL</button>
+        <button class="del-sort-btn" data-sort="name" onclick="setDeletedSort('name')">NAME</button>
+        <button class="del-sort-btn" data-sort="last_seen" onclick="setDeletedSort('last_seen')">LAST SEEN</button>
+        <button class="del-sort-btn" data-sort="class" onclick="setDeletedSort('class')">CLASS</button>
       </div>
       <div class="modal-body" id="deleted-modal-body">
         <div class="loading" style="padding:40px;">Loading</div>
