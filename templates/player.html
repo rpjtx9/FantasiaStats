@@ -487,6 +487,8 @@ const CLASS_COLORS_MAP = {
 };
 
 let deletedLoaded = false;
+let deletedPlayers = [];
+let deletedSort = 'level';
 
 function fmtTs(ts) {
   if (!ts) return '—';
@@ -500,44 +502,58 @@ function fmtExpShort(n) {
   return n.toLocaleString();
 }
 
+function setDeletedSort(key) {
+  deletedSort = key;
+  document.querySelectorAll('.del-sort-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.sort === key));
+  renderDeletedList();
+}
+
+function renderDeletedList() {
+  const sorted = [...deletedPlayers].sort((a, b) => {
+    if (deletedSort === 'level') return b.level - a.level;
+    if (deletedSort === 'name') return a.name.localeCompare(b.name);
+    if (deletedSort === 'last_seen') return (b.last_seen || '').localeCompare(a.last_seen || '');
+    if (deletedSort === 'class') return (a.class || '').localeCompare(b.class || '');
+    return 0;
+  });
+  const body = document.getElementById('deleted-modal-body');
+  body.innerHTML = sorted.map(p => {
+    const color = CLASS_COLORS_MAP[p.class] || '#aaa';
+    const lastSeenDate = fmtTs(p.last_seen);
+    const hasActivity = p.total_exp > 0;
+    const badgeColor = hasActivity ? 'rgba(239,68,68,0.15)' : 'rgba(100,116,139,0.15)';
+    const badgeText  = hasActivity ? 'WAS ACTIVE' : 'NO ACTIVITY';
+    const badgeBorder = hasActivity ? 'rgba(239,68,68,0.4)' : 'rgba(100,116,139,0.3)';
+    const badgeFg = hasActivity ? 'var(--red)' : 'var(--muted)';
+    return '<div class="deleted-row" onclick="closeDeletedModal(); loadPlayer(\'' + p.name.replace(/'/g, "\'") + '\')">'
+      + '<div style="width:9px;height:9px;border-radius:50%;background:' + color + ';flex-shrink:0;"></div>'
+      + '<div class="deleted-name">' + p.name + '</div>'
+      + '<div class="deleted-meta">Lv.' + p.level + ' ' + p.job_name + '</div>'
+      + '<div class="deleted-meta" style="min-width:70px;text-align:right;">last seen ' + lastSeenDate + '</div>'
+      + '<div class="deleted-meta" style="min-width:60px;text-align:right;">' + (hasActivity ? '+' + fmtExpShort(p.total_exp) : '—') + '</div>'
+      + '<div class="deleted-badge" style="background:' + badgeColor + ';border:1px solid ' + badgeBorder + ';color:' + badgeFg + ';">' + badgeText + '</div>'
+      + '</div>';
+  }).join('');
+}
+
 async function openDeletedModal() {
   document.getElementById('deleted-modal').classList.add('open');
   if (deletedLoaded) return;
   deletedLoaded = true;
 
   const res = await fetch('/api/players/deleted');
-  const players = await res.json();
+  deletedPlayers = await res.json();
 
   document.getElementById('deleted-modal-sub').textContent =
-    `${players.length} players absent from current rankings — click to view profile`;
+    deletedPlayers.length + ' players absent from current rankings — click to view profile';
 
   const body = document.getElementById('deleted-modal-body');
-
-  if (!players.length) {
-    body.innerHTML = '<div class="empty-state">No deleted players found.</div>';
+  if (!deletedPlayers.length) {
+    body.innerHTML = '<div class="empty-state">No removed players found.</div>';
     return;
   }
-
-  body.innerHTML = players.map(p => {
-    const color = CLASS_COLORS_MAP[p.class] || '#aaa';
-    const lastSeenDate = fmtTs(p.last_seen);
-
-    // Determine if they had meaningful activity
-    const hasActivity = p.total_exp > 0;
-    const badgeColor = hasActivity ? 'rgba(239,68,68,0.15)' : 'rgba(100,116,139,0.15)';
-    const badgeText  = hasActivity ? 'WAS ACTIVE' : 'NO ACTIVITY';
-    const badgeBorder = hasActivity ? 'rgba(239,68,68,0.4)' : 'rgba(100,116,139,0.3)';
-    const badgeFg = hasActivity ? 'var(--red)' : 'var(--muted)';
-
-    return `<div class="deleted-row" onclick="closeDeletedModal(); loadPlayer('${p.name.replace(/'/g, "\\'")}')">
-      <div style="width:9px;height:9px;border-radius:50%;background:${color};flex-shrink:0;"></div>
-      <div class="deleted-name">${p.name}</div>
-      <div class="deleted-meta">Lv.${p.level} ${p.job_name}</div>
-      <div class="deleted-meta" style="min-width:70px;text-align:right;">last seen ${lastSeenDate}</div>
-      <div class="deleted-meta" style="min-width:60px;text-align:right;">${hasActivity ? '+'+fmtExpShort(p.total_exp) : '—'}</div>
-      <div class="deleted-badge" style="background:${badgeColor};border:1px solid ${badgeBorder};color:${badgeFg};">${badgeText}</div>
-    </div>`;
-  }).join('');
+  renderDeletedList();
 }
 
 function closeDeletedModal() {
