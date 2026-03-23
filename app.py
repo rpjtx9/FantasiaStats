@@ -996,9 +996,12 @@ def guild_roster():
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-        """SELECT gm.player_name, p.last_active
+        """SELECT gm.player_name,
+                  (SELECT MAX(s.timestamp)
+                   FROM player_activity pa
+                   JOIN snapshots s ON pa.snapshot_id = s.id
+                   WHERE pa.name = gm.player_name AND pa.exp_gained > 0) AS last_active
            FROM guild_members gm
-           LEFT JOIN players p ON p.name = gm.player_name
            WHERE gm.guild_id = ?
            ORDER BY gm.player_name""",
         (session["guild_id"],)
