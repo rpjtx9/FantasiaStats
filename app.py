@@ -996,10 +996,14 @@ def guild_roster():
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT player_name FROM guild_members WHERE guild_id = ? ORDER BY player_name",
+        """SELECT gm.player_name, p.last_active
+           FROM guild_members gm
+           LEFT JOIN players p ON p.name = gm.player_name
+           WHERE gm.guild_id = ?
+           ORDER BY gm.player_name""",
         (session["guild_id"],)
     )
-    members = [r[0] for r in cursor.fetchall()]
+    members = [{"name": r["player_name"], "last_active": r["last_active"]} for r in cursor.fetchall()]
     # All known player names for autocomplete
     cursor.execute("SELECT DISTINCT name FROM players ORDER BY name")
     all_players = [r[0] for r in cursor.fetchall()]
