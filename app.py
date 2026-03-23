@@ -577,6 +577,8 @@ def api_player(name):
         })
 
     total_exp = sum(exp_gains)
+    days_tracked = (datetime.strptime(latest["timestamp"], TS_FMT) - datetime.strptime(rows[0]["timestamp"], TS_FMT)).days
+    avg_exp_per_day = round(total_exp / days_tracked) if days_tracked > 0 else 0
     return jsonify({
         "name": name,
         "job_name": JOB_NAMES.get(latest["job"], "Unknown"),
@@ -587,11 +589,12 @@ def api_player(name):
         "quests": latest["quests"],
         "cards": latest["cards"],
         "total_exp_gained": total_exp,
+        "avg_exp_per_day": avg_exp_per_day,
         "levels_gained": latest["level"] - rows[0]["level"],
         "first_seen": rows[0]["timestamp"],
         "last_active": last_active,
         "is_deleted": is_deleted,
-        "days_tracked": (datetime.strptime(latest["timestamp"], TS_FMT) - datetime.strptime(rows[0]["timestamp"], TS_FMT)).days,
+        "days_tracked": days_tracked,
         "data_points": data_points,
     })
 
