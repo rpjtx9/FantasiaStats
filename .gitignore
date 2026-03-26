@@ -3,6 +3,7 @@ data/snapshots/
 data/charts/
 data/fantasia.db
 data/fantasia.db.bak
+data/fantasia.db-journal
 data/icons
 __pycache__/
 *.pyc

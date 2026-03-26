@@ -49,11 +49,11 @@ def get_snapshot_window(hours=None, start=None, end=None):
         prev = snapshot_closest_to(cursor, start_dt)
         conn.close()
         # ensure latest is actually after prev
-        if latest["id"] <= prev["id"]:
+        if latest["timestamp"] <= prev["timestamp"]:
             return prev, None
         return latest, prev
     elif hours:
-        cursor.execute("SELECT id, timestamp FROM snapshots ORDER BY id DESC LIMIT 1")
+        cursor.execute("SELECT id, timestamp FROM snapshots ORDER BY timestamp DESC LIMIT 1")
         latest = dict(cursor.fetchone())
         latest_ts = datetime.strptime(latest["timestamp"], TS_FMT)
         target_ts = latest_ts - timedelta(hours=hours)
@@ -61,7 +61,7 @@ def get_snapshot_window(hours=None, start=None, end=None):
         conn.close()
         return latest, prev
     else:
-        cursor.execute("SELECT id, timestamp FROM snapshots ORDER BY id DESC LIMIT 2")
+        cursor.execute("SELECT id, timestamp FROM snapshots ORDER BY timestamp DESC LIMIT 2")
         rows = cursor.fetchall()
         conn.close()
         if len(rows) < 2:
@@ -182,10 +182,10 @@ def api_activity():
         SELECT pa.name, SUM(pa.exp_gained) as exp_gained, p.job, p.level
         FROM player_activity pa
         JOIN players p ON p.snapshot_id = ? AND p.name = pa.name
-        WHERE pa.snapshot_id IN (SELECT id FROM snapshots WHERE id > ? AND id <= ?)
+        WHERE pa.snapshot_id IN (SELECT id FROM snapshots WHERE timestamp > ? AND timestamp <= ?)
         GROUP BY pa.name
         ORDER BY exp_gained DESC
-    """, (latest_id, prev_id, latest_id))
+    """, (latest_id, prev_ts, latest_ts))
     active = [dict(row) for row in cursor.fetchall()]
 
     cursor.execute("""
@@ -259,10 +259,10 @@ def api_active_class_distribution():
         SELECT pa.name, SUM(pa.exp_gained) as exp_gained, p.job, p.level
         FROM player_activity pa
         JOIN players p ON p.snapshot_id = ? AND p.name = pa.name
-        WHERE pa.snapshot_id IN (SELECT id FROM snapshots WHERE id > ? AND id <= ?)
+        WHERE pa.snapshot_id IN (SELECT id FROM snapshots WHERE timestamp > ? AND timestamp <= ?)
         GROUP BY pa.name
         ORDER BY exp_gained DESC
-    """, (latest_id, prev_id, latest_id))
+    """, (latest_id, prev_ts, latest_ts))
     active = [dict(row) for row in cursor.fetchall()]
     conn.close()
 
@@ -335,27 +335,19 @@ def api_server_health():
         if day >= today:
             continue
         day_snaps = days[day]
-        min_id = day_snaps[0]["id"]
-        max_id = day_snaps[-1]["id"]
-        # The first snapshot in a day is the *baseline* — its player_activity
-        # records belong to the previous period, but all subsequent snapshots
-        # within (and up to the next day's baseline) represent this day's gains.
-        # lower_id = day's first snap (baseline); upper_id = next day's first snap (next baseline)
-        # Query: id > lower_id AND id <= upper_id captures exactly this day's activity.
-        prev_snap = next((s for s in reversed(all_snapshots) if s["id"] < min_id), None)
-        lower_id = min_id
+        lower_ts = day_snaps[0]["timestamp"]
+        max_ts   = day_snaps[-1]["timestamp"]
+        prev_snap = next((s for s in reversed(all_snapshots) if s["timestamp"] < lower_ts), None)
         next_day = (datetime.strptime(day, "%Y-%m-%d") + timedelta(days=1)).strftime("%Y-%m-%d")
         next_day_snaps = days.get(next_day, [])
-        # Next day's first snap is that day's baseline — use it as our upper bound
-        # so its activity isn't double-counted in our day
-        upper_id = next_day_snaps[0]["id"] if next_day_snaps else max_id
+        upper_ts = next_day_snaps[0]["timestamp"] if next_day_snaps else max_ts
         cursor.execute("""
             SELECT COUNT(DISTINCT pa.name) as cnt
             FROM player_activity pa
             WHERE pa.snapshot_id IN (
-                SELECT id FROM snapshots WHERE id > ? AND id <= ?
+                SELECT id FROM snapshots WHERE timestamp > ? AND timestamp <= ?
             )
-        """, (lower_id, upper_id))
+        """, (lower_ts, upper_ts))
         count = cursor.fetchone()["cnt"]
         if prev_snap is None:
             continue
