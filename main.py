@@ -1,10 +1,18 @@
 import argparse
 import json
+import shutil
 from datetime import datetime
 from pathlib import Path
 from fetch import fetch_all_players, save_snapshot, load_snapshot, get_latest_snapshots
 from analyze import level_distribution, level_distribution_by_class_grouped, job_popularity, active_players, summary
 from database import initialize_db, ingest_snapshot
+
+DB_PATH = Path("data/fantasia.db")
+
+def backup_db():
+    if DB_PATH.exists():
+        shutil.copy2(DB_PATH, DB_PATH.with_suffix(".db.bak"))
+        print(f"Database backed up to {DB_PATH.with_suffix('.db.bak')}")
 
 
 def run_fetch():
@@ -104,13 +112,16 @@ def main():
     args = parser.parse_args()
 
     if args.all:
+        backup_db()
         run_fetch()
         run_analyze()
     elif args.fetch:
+        backup_db()
         run_fetch()
     elif args.analyze:
         run_analyze()
     elif args.backfill:
+        backup_db()
         run_backfill()
     else:
         parser.print_help()

@@ -1,6 +1,8 @@
+.claude/settings.local.json
 data/snapshots/
 data/charts/
 data/fantasia.db
+data/fantasia.db.bak
 data/icons
 __pycache__/
 *.pyc
