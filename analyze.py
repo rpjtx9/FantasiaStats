@@ -146,6 +146,8 @@ def exp_to_level_percent(exp_gained, current_level):
     if current_level < 1 or current_level > 200:
         return 0.0
     level_exp = FANTASIA_EXP_TABLE.get(current_level, 1)
+    if not level_exp:
+        return 0.0
     return round((exp_gained / level_exp) * 100, 1)
 
 
