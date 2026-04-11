@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EXP Tracker — FantasiaStats.WIN</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:        #0b0e1a;
+  --surface:   #111827;
+  --card:      #141d2e;
+  --border:    #1e2d47;
+  --accent:    #00d4ff;
+  --accent2:   #7c3aed;
+  --green:     #10b981;
+  --yellow:    #f59e0b;
+  --text:      #e2e8f0;
+  --muted:     #64748b;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Barlow', sans-serif;
+  font-weight: 400;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.03) 2px,
+    rgba(0,0,0,0.03) 4px
+  );
+  pointer-events: none;
+  z-index: 9999;
+}
+
+nav {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  background: rgba(11,14,26,0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  padding: 8px 32px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  min-height: 56px;
+  gap: 8px 32px;
+}
+
+.nav-logo {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 23px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+  text-transform: uppercase;
+  text-decoration: none;
+  flex-shrink: 0;
+}
+.nav-logo span { color: var(--text); }
+
+.nav-links { display: flex; gap: 4px; flex: 1; }
+.nav-links a {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 6px 12px;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+}
+.nav-links a:hover { color: var(--text); background: rgba(255,255,255,0.05); }
+.nav-links a.active { color: var(--accent); background: rgba(0,212,255,0.08); }
+
+main {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 48px 24px 80px;
+}
+
+/* ── Hero ── */
+.hero {
+  margin-bottom: 48px;
+}
+.hero-label {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+.hero h1 {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 40px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  line-height: 1.1;
+  margin-bottom: 6px;
+}
+.version-badge {
+  display: inline-block;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 2px 8px;
+  margin-bottom: 20px;
+}
+.hero p {
+  font-size: 17px;
+  color: #94a3b8;
+  line-height: 1.65;
+  max-width: 680px;
+  margin-bottom: 12px;
+}
+.hero ul {
+  list-style: none;
+  padding: 0;
+  margin-bottom: 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.hero ul li {
+  font-size: 15px;
+  color: #94a3b8;
+  padding-left: 18px;
+  position: relative;
+}
+.hero ul li::before {
+  content: '—';
+  position: absolute;
+  left: 0;
+  color: var(--accent);
+  font-family: 'Share Tech Mono', monospace;
+}
+
+.download-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--accent);
+  color: #0b0e1a;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  text-decoration: none;
+  padding: 12px 28px;
+  border-radius: 6px;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.download-btn:hover { opacity: 0.88; transform: translateY(-1px); }
+.download-btn svg { flex-shrink: 0; }
+
+.file-meta {
+  margin-top: 10px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.06em;
+}
+
+/* ── Cards ── */
+.section {
+  margin-bottom: 40px;
+}
+.section-title {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+  margin-bottom: 20px;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 24px 28px;
+}
+
+/* Steps */
+.steps { display: flex; flex-direction: column; gap: 16px; }
+.step { display: flex; gap: 16px; align-items: flex-start; }
+.step-num {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(0,212,255,0.12);
+  border: 1px solid rgba(0,212,255,0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 13px;
+  color: var(--accent);
+  margin-top: 1px;
+}
+.step-body { flex: 1; font-size: 15px; color: #94a3b8; line-height: 1.6; }
+.step-body strong { color: var(--text); font-weight: 600; }
+.step-body a { color: var(--accent); text-decoration: none; }
+.step-body a:hover { text-decoration: underline; }
+.step-body code {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 13px;
+  background: rgba(0,212,255,0.07);
+  border: 1px solid rgba(0,212,255,0.15);
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: var(--accent);
+}
+
+.callout {
+  background: rgba(0,212,255,0.05);
+  border: 1px solid rgba(0,212,255,0.2);
+  border-radius: 6px;
+  padding: 14px 18px;
+  margin-top: 16px;
+  font-size: 14px;
+  color: #94a3b8;
+  line-height: 1.6;
+}
+.callout strong { color: var(--text); }
+.callout code {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 12px;
+  background: rgba(0,212,255,0.07);
+  border: 1px solid rgba(0,212,255,0.15);
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: var(--accent);
+}
+
+/* Changelog */
+.changelog-entry { margin-bottom: 4px; }
+.changelog-version {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 13px;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+.changelog-list { list-style: none; padding: 0; display: flex; flex-direction: column; gap: 5px; }
+.changelog-list li {
+  font-size: 14px;
+  color: #94a3b8;
+  padding-left: 16px;
+  position: relative;
+}
+.changelog-list li::before {
+  content: '+';
+  position: absolute;
+  left: 0;
+  color: var(--green);
+  font-family: 'Share Tech Mono', monospace;
+}
+
+/* First-run steps */
+.run-steps { display: flex; flex-direction: column; gap: 10px; counter-reset: run-step; }
+.run-step {
+  display: flex;
+  gap: 12px;
+  font-size: 15px;
+  color: #94a3b8;
+  line-height: 1.6;
+  counter-increment: run-step;
+}
+.run-step::before {
+  content: counter(run-step) '.';
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 13px;
+  color: var(--muted);
+  flex-shrink: 0;
+  width: 20px;
+  padding-top: 2px;
+}
+.run-step strong { color: var(--text); }
+.run-step code {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 13px;
+  background: rgba(0,212,255,0.07);
+  border: 1px solid rgba(0,212,255,0.15);
+  border-radius: 3px;
+  padding: 1px 5px;
+  color: var(--accent);
+}
+
+footer {
+  text-align: center;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 64px;
+  letter-spacing: 0.04em;
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a class="nav-logo" href="/">Fantasia<span>Stats</span></a>
+  <div class="nav-links">
+    <a href="/">Dashboard</a>
+    <a href="/guild">Guild</a>
+    <a href="/jobs">Jobs</a>
+    <a href="/exp-tracker" class="active">EXP Tracker</a>
+  </div>
+</nav>
+
+<main>
+
+  <!-- Hero -->
+  <div class="hero">
+    <div class="hero-label">Desktop Tool</div>
+    <h1>Fantasia EXP Tracker</h1>
+    <div class="version-badge">v0.1.0</div>
+    <p>
+      A real-time screen-OCR overlay for MapleStory Fantasia that reads your EXP bar,
+      character level, and minimap name directly from the game window, and automatically
+      logs per-map sessions with EXP/hr stats to a CSV file.
+    </p>
+    <ul>
+      <li>Auto-detects the game (or Magpie-scaled) window on startup</li>
+      <li>Recognises EXP and level digits via pixel-perfect template matching</li>
+      <li>Fuzzy-matches minimap text against the full MapleStory map list</li>
+      <li>Tracks a session per map, with rolling EXP/hr and time-to-level estimates</li>
+      <li>Logs completed map sessions to <code>exp_sessions.csv</code></li>
+    </ul>
+    <a class="download-btn" href="/exp-tracker/download">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+        <polyline points="7 10 12 15 17 10"/>
+        <line x1="12" y1="15" x2="12" y2="3"/>
+      </svg>
+      Download — v0.1.0
+    </a>
+    <div class="file-meta">FantasiaExpTracker-0.1.0.zip &nbsp;·&nbsp; Windows 10/11 &nbsp;·&nbsp; Standalone executable</div>
+  </div>
+
+  <!-- Installation -->
+  <div class="section">
+    <div class="section-title">Installation</div>
+    <div class="card">
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-body">
+            <strong>Install Tesseract OCR</strong> from the UB Mannheim build:<br>
+            <a href="https://github.com/UB-Mannheim/tesseract/wiki" target="_blank" rel="noopener">github.com/UB-Mannheim/tesseract/wiki</a>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-body">
+            <strong>Accept the default install path</strong> — <code>C:\Program Files\Tesseract-OCR\</code> —
+            and the tracker will find it automatically.
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-body">
+            <strong>Extract the zip</strong> and run <code>FantasiaExpTracker.exe</code>. No Python install required.
+          </div>
+        </div>
+      </div>
+      <div class="callout">
+        <strong>Installed Tesseract somewhere else?</strong> Set <code>"tesseract_path"</code> in
+        <code>exp_tracker_config.json</code> to the full path of <code>tesseract.exe</code>.
+        The config file is created on first run.
+      </div>
+    </div>
+  </div>
+
+  <!-- First-run setup -->
+  <div class="section">
+    <div class="section-title">First-Run Setup</div>
+    <div class="card">
+      <div class="run-steps">
+        <div class="run-step">Launch Fantasia (and Magpie, if you use it to upscale the window).</div>
+        <div class="run-step">Launch the tracker. On startup it will auto-detect the EXP and Level regions from the game window.</div>
+        <div class="run-step">Click <strong>SETUP → Set MAP Region</strong>, then drag a box over the map-name text on your minimap. Map position varies by resolution, so this must be set manually.</div>
+        <div class="run-step">Enter your character level, or let the level OCR pick it up.</div>
+        <div class="run-step">Press <strong>START</strong>.</div>
+      </div>
+      <div class="callout">
+        Completed map sessions (30 seconds or longer by default) are appended to
+        <code>exp_sessions.csv</code> in the application folder.
+      </div>
+    </div>
+  </div>
+
+  <!-- Changelog -->
+  <div class="section">
+    <div class="section-title">Changelog</div>
+    <div class="card changelog-entry">
+      <div class="changelog-version">v0.1.0 — Initial release</div>
+      <ul class="changelog-list">
+        <li>Real-time EXP bar and level OCR via pixel-perfect template matching</li>
+        <li>Minimap name detection with fuzzy matching against full map list</li>
+        <li>Per-map session tracking with rolling EXP/hr and time-to-level estimates</li>
+        <li>Auto-detection of Fantasia and Magpie-scaled game windows</li>
+        <li>Session logging to <code>exp_sessions.csv</code></li>
+        <li>Dark and Maple UI themes</li>
+      </ul>
+    </div>
+  </div>
+
+</main>
+
+<footer>
+  fantasiastats.win &nbsp;·&nbsp; not affiliated with Fantasia MS
+</footer>
+
+</body>
+</html>

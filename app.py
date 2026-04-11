@@ -5,7 +5,7 @@ Run: python app.py
 Then open: http://localhost:5000
 """
 
-from flask import Flask, render_template, jsonify, request, session, redirect, url_for
+from flask import Flask, render_template, jsonify, request, session, redirect, url_for, send_from_directory
 from pathlib import Path
 from datetime import datetime, timedelta
 import os
@@ -1072,6 +1072,18 @@ def guild_roster_set_password():
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
+
+
+EXP_TRACKER_DIR = Path(__file__).parent / "ExpTracker"
+EXP_TRACKER_FILE = "FantasiaExpTracker-0.1.0.zip"
+
+@app.route("/exp-tracker")
+def exp_tracker():
+    return render_template("exp_tracker.html")
+
+@app.route("/exp-tracker/download")
+def exp_tracker_download():
+    return send_from_directory(EXP_TRACKER_DIR, EXP_TRACKER_FILE, as_attachment=True)
 
 
 if __name__ == "__main__":
