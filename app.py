@@ -1075,7 +1075,7 @@ def guild_roster_set_password():
 
 
 EXP_TRACKER_DIR = Path(__file__).parent / "ExpTracker"
-EXP_TRACKER_FILE = "FantasiaExpTracker-0.1.0.zip"
+EXP_TRACKER_FILE = "FantasiaExpTracker-0.1.1.zip"
 
 @app.route("/exp-tracker")
 def exp_tracker():
