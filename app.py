@@ -1075,15 +1075,28 @@ def guild_roster_set_password():
 
 
 EXP_TRACKER_DIR = Path(__file__).parent / "ExpTracker"
-EXP_TRACKER_FILE = "FantasiaExpTracker-0.1.1.zip"
+
+def _get_exp_tracker_file():
+    matches = sorted(EXP_TRACKER_DIR.glob("FantasiaExpTracker-*.zip"))
+    return matches[-1] if matches else None
+
+def _get_exp_tracker_version():
+    f = _get_exp_tracker_file()
+    if f:
+        # FantasiaExpTracker-0.1.1.zip -> 0.1.1
+        return f.stem.split("-", 1)[-1]
+    return "unknown"
 
 @app.route("/exp-tracker")
 def exp_tracker():
-    return render_template("exp_tracker.html")
+    return render_template("exp_tracker.html", version=_get_exp_tracker_version())
 
 @app.route("/exp-tracker/download")
 def exp_tracker_download():
-    return send_from_directory(EXP_TRACKER_DIR, EXP_TRACKER_FILE, as_attachment=True)
+    f = _get_exp_tracker_file()
+    if f is None:
+        abort(404)
+    return send_from_directory(EXP_TRACKER_DIR, f.name, as_attachment=True)
 
 
 if __name__ == "__main__":

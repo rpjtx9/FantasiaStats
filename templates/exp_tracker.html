@@ -340,7 +340,7 @@ footer {
   <div class="hero">
     <div class="hero-label">Desktop Tool</div>
     <h1>Fantasia EXP Tracker</h1>
-    <div class="version-badge">v0.1.1</div>
+    <div class="version-badge">v{{ version }}</div>
     <p>
       A real-time screen-OCR overlay for MapleStory Fantasia that reads your EXP bar,
       character level, and minimap name directly from the game window, and automatically
@@ -359,9 +359,9 @@ footer {
         <polyline points="7 10 12 15 17 10"/>
         <line x1="12" y1="15" x2="12" y2="3"/>
       </svg>
-      Download — v0.1.1
+      Download — v{{ version }}
     </a>
-    <div class="file-meta">FantasiaExpTracker-0.1.1.zip &nbsp;·&nbsp; Windows 10/11 &nbsp;·&nbsp; Standalone executable</div>
+    <div class="file-meta">FantasiaExpTracker-{{ version }}.zip &nbsp;·&nbsp; Windows 10/11 &nbsp;·&nbsp; Standalone executable</div>
   </div>
 
   <!-- Installation -->
@@ -420,7 +420,19 @@ footer {
   <div class="section">
     <div class="section-title">Changelog</div>
     <div class="card changelog-entry">
-      <div class="changelog-version">v0.1.1 — Initial release</div>
+      <div class="changelog-version">v0.1.2</div>
+      <ul class="changelog-list">
+        <li>Resolved rebuild templates locking up</li>
+      </ul>
+    </div>
+    <div class="card changelog-entry" style="margin-top:12px">
+      <div class="changelog-version">v0.1.1</div>
+      <ul class="changelog-list">
+        <li>Resolved dependencies incorrectly packaged with the .exe</li>
+      </ul>
+    </div>
+    <div class="card changelog-entry" style="margin-top:12px">
+      <div class="changelog-version">v0.1.0 — Initial release</div>
       <ul class="changelog-list">
         <li>Real-time EXP bar and level OCR via pixel-perfect template matching</li>
         <li>Minimap name detection with fuzzy matching against full map list</li>
