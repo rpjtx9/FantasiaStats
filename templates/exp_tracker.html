@@ -406,13 +406,13 @@ footer {
       <div class="run-steps">
         <div class="run-step">Launch Fantasia (and Magpie, if you use it to upscale the window).</div>
         <div class="run-step">Launch the tracker. On startup it will auto-detect the EXP and Level regions from the game window.</div>
-        <div class="run-step">Click <strong>SETUP → Set MAP Region</strong>, then drag a box over the map-name text on your minimap. Map position varies by resolution, so this must be set manually.</div>
-        <div class="run-step">Enter your character level, or let the level OCR pick it up.</div>
-        <div class="run-step">Press <strong>START</strong>.</div>
+        <div class="run-step">Press <strong>Start</strong> to take an initial reading from the game window.</div>
+        <div class="run-step">Open <strong>Settings (⚙)</strong> and run <strong>Rebuild Templates</strong> for both EXP and Level. This builds pixel-perfect templates for each digit 0–9 at your resolution, and is required for accurate reading.</div>
+        <div class="run-step"><strong>(Optional)</strong> Click <strong>Settings (⚙) → Set Map Region</strong>, then drag a box over the map-name text on your minimap. Required for per-map session logging — map position varies by resolution so it must be set manually. Requires Tesseract to be installed.</div>
       </div>
       <div class="callout">
         Completed map sessions (30 seconds or longer by default) are appended to
-        <code>exp_sessions.csv</code> in the application folder.
+        <code>exp_sessions.csv</code> in the application folder. Map session logging requires Tesseract and a map region to be configured.
       </div>
     </div>
   </div>
