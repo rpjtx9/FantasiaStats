@@ -179,10 +179,23 @@ def api_activity():
     cursor = conn.cursor()
 
     cursor.execute("""
+        WITH ordered AS (
+            SELECT name, snapshot_id, level,
+                   LAG(level) OVER (PARTITION BY name ORDER BY snapshot_id) AS prev_level
+            FROM players
+        ),
+        rerolls AS (
+            SELECT name, MAX(snapshot_id) AS reroll_snap
+            FROM ordered
+            WHERE prev_level IS NOT NULL AND level < prev_level
+            GROUP BY name
+        )
         SELECT pa.name, SUM(pa.exp_gained) as exp_gained, p.job, p.level
         FROM player_activity pa
         JOIN players p ON p.snapshot_id = ? AND p.name = pa.name
+        LEFT JOIN rerolls r ON r.name = pa.name
         WHERE pa.snapshot_id IN (SELECT id FROM snapshots WHERE timestamp > ? AND timestamp <= ?)
+          AND (r.reroll_snap IS NULL OR pa.snapshot_id > r.reroll_snap)
         GROUP BY pa.name
         ORDER BY exp_gained DESC
     """, (latest_id, prev_ts, latest_ts))
@@ -256,10 +269,23 @@ def api_active_class_distribution():
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
+        WITH ordered AS (
+            SELECT name, snapshot_id, level,
+                   LAG(level) OVER (PARTITION BY name ORDER BY snapshot_id) AS prev_level
+            FROM players
+        ),
+        rerolls AS (
+            SELECT name, MAX(snapshot_id) AS reroll_snap
+            FROM ordered
+            WHERE prev_level IS NOT NULL AND level < prev_level
+            GROUP BY name
+        )
         SELECT pa.name, SUM(pa.exp_gained) as exp_gained, p.job, p.level
         FROM player_activity pa
         JOIN players p ON p.snapshot_id = ? AND p.name = pa.name
+        LEFT JOIN rerolls r ON r.name = pa.name
         WHERE pa.snapshot_id IN (SELECT id FROM snapshots WHERE timestamp > ? AND timestamp <= ?)
+          AND (r.reroll_snap IS NULL OR pa.snapshot_id > r.reroll_snap)
         GROUP BY pa.name
         ORDER BY exp_gained DESC
     """, (latest_id, prev_ts, latest_ts))

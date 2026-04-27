@@ -75,6 +75,31 @@ main { max-width: 1400px; margin: 0 auto; padding: 32px 24px; }
 .loading { text-align: center; padding: 60px; color: var(--muted); font-family: 'Share Tech Mono', monospace; font-size: 14px; }
 .loading::after { content: ''; animation: dots 1.2s steps(3,end) infinite; }
 @keyframes dots { 0%,20%{content:'.'} 40%,60%{content:'..'} 80%,100%{content:'...'} }
+@keyframes maxed-pulse {
+  0%, 100% { box-shadow: 0 0 6px #fbbf24, 0 0 12px rgba(251,191,36,0.4); }
+  50%      { box-shadow: 0 0 10px #fde047, 0 0 22px rgba(253,224,71,0.7); }
+}
+@keyframes maxed-text-glow {
+  0%, 100% { text-shadow: 0 0 4px rgba(251,191,36,0.4); }
+  50%      { text-shadow: 0 0 8px rgba(253,224,71,0.8); }
+}
+.maxed-pill {
+  display: flex; align-items: center; gap: 6px;
+  padding: 3px 10px; border-radius: 999px;
+  background: linear-gradient(90deg, rgba(251,191,36,0.12), rgba(253,224,71,0.18), rgba(251,191,36,0.12));
+  border: 1px solid rgba(251,191,36,0.5);
+}
+.maxed-dot {
+  width: 8px; height: 8px; border-radius: 50%; background: #fde047;
+  animation: maxed-pulse 1.8s ease-in-out infinite;
+  flex-shrink: 0;
+}
+.maxed-label {
+  font-size: 11px; color: #fde047;
+  font-family: 'Share Tech Mono', monospace;
+  letter-spacing: 0.1em; text-transform: uppercase; font-weight: 700;
+  animation: maxed-text-glow 1.8s ease-in-out infinite;
+}
 .empty-state { color: var(--muted); font-size: 14px; text-align: center; padding: 40px; }
 .class-dot { border-radius: 50%; flex-shrink: 0; }
 
@@ -313,6 +338,12 @@ async function loadPlayer(name) {
         <div style="display:flex;align-items:center;gap:10px;">
           <div class="scorecard-name">${d.name}</div>
           ${(() => {
+            if (d.level >= 200) {
+              return `<div class="maxed-pill" title="Reached maximum level">
+                <div class="maxed-dot"></div>
+                <span class="maxed-label">Max Level</span>
+              </div>`;
+            }
             const isActive = d.last_active && (() => {
               const t = d.last_active.replace('_',' ').replace(/-(\d{2})-(\d{2})$/, ':$1:$2');
               return (new Date() - new Date(t)) < 30*24*60*60*1000;
