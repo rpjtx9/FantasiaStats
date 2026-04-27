@@ -179,10 +179,15 @@ def api_activity():
     cursor = conn.cursor()
 
     cursor.execute("""
-        WITH ordered AS (
-            SELECT name, snapshot_id, level,
-                   LAG(level) OVER (PARTITION BY name ORDER BY snapshot_id) AS prev_level
-            FROM players
+        WITH active_names AS (
+            SELECT DISTINCT pa.name FROM player_activity pa
+            WHERE pa.snapshot_id IN (SELECT id FROM snapshots WHERE timestamp > ? AND timestamp <= ?)
+        ),
+        ordered AS (
+            SELECT p.name, p.snapshot_id, p.level,
+                   LAG(p.level) OVER (PARTITION BY p.name ORDER BY p.snapshot_id) AS prev_level
+            FROM players p
+            WHERE p.name IN (SELECT name FROM active_names)
         ),
         rerolls AS (
             SELECT name, MAX(snapshot_id) AS reroll_snap
@@ -198,7 +203,7 @@ def api_activity():
           AND (r.reroll_snap IS NULL OR pa.snapshot_id > r.reroll_snap)
         GROUP BY pa.name
         ORDER BY exp_gained DESC
-    """, (latest_id, prev_ts, latest_ts))
+    """, (prev_ts, latest_ts, latest_id, prev_ts, latest_ts))
     active = [dict(row) for row in cursor.fetchall()]
 
     cursor.execute("""
@@ -269,10 +274,15 @@ def api_active_class_distribution():
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        WITH ordered AS (
-            SELECT name, snapshot_id, level,
-                   LAG(level) OVER (PARTITION BY name ORDER BY snapshot_id) AS prev_level
-            FROM players
+        WITH active_names AS (
+            SELECT DISTINCT pa.name FROM player_activity pa
+            WHERE pa.snapshot_id IN (SELECT id FROM snapshots WHERE timestamp > ? AND timestamp <= ?)
+        ),
+        ordered AS (
+            SELECT p.name, p.snapshot_id, p.level,
+                   LAG(p.level) OVER (PARTITION BY p.name ORDER BY p.snapshot_id) AS prev_level
+            FROM players p
+            WHERE p.name IN (SELECT name FROM active_names)
         ),
         rerolls AS (
             SELECT name, MAX(snapshot_id) AS reroll_snap
@@ -288,7 +298,7 @@ def api_active_class_distribution():
           AND (r.reroll_snap IS NULL OR pa.snapshot_id > r.reroll_snap)
         GROUP BY pa.name
         ORDER BY exp_gained DESC
-    """, (latest_id, prev_ts, latest_ts))
+    """, (prev_ts, latest_ts, latest_id, prev_ts, latest_ts))
     active = [dict(row) for row in cursor.fetchall()]
     conn.close()
 
